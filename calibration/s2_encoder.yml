@@ -1,0 +1,13 @@
+# Known-answer controls for the S2 encoder eval. Populated with real
+# statements once the row-2 corpus lands; ids and expectations are stable.
+#
+# duplicate-retrieval: two declarations sharing a lock must retrieve each
+# other at rank 1 (MRR ~ 1.0). cross-module-negative: random pairs from
+# disjoint areas must score in the bottom half.
+controls:
+  - id: dup-retrieval-placeholder
+    kind: duplicate_retrieval
+    expect: pending-corpus
+  - id: cross-module-negative-placeholder
+    kind: negative_pair
+    expect: pending-corpus
