@@ -1,0 +1,21 @@
+# S2: span-MLM pretraining of the 33M statement encoder.
+# corpus_cids / tokenizer_cid are filled from the quod manifest + frozen
+# tokenizer before the first real run; the ledger refuses to compare metrics
+# across a different (mathlib_pin, tokenizer_cid) pair.
+mathlib_pin: "crouzeix:v4.28.0:8f9d9cff"
+corpus_cids: []
+tokenizer_cid: null
+tokenizer_path: runs/tokenizer/lean-unigram-24k.json
+cache_dir: corpora/cache
+cache_name: declarations-train
+seed: 1337
+batch_size: 96
+steps: 60000
+lr: 3.0e-4
+compile: true
+encoder:
+  d_model: 512
+  n_layers: 8
+  n_heads: 8
+  d_ff: 2048
+  max_seq: 512
