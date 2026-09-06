@@ -1,0 +1,40 @@
+[project]
+name = "lemma"
+version = "0.1.0"
+description = "Self-supervised encoders over gate-verified Lean/Mathlib corpora; quod is the label generator."
+requires-python = "==3.12.*"
+dependencies = [
+    "torch==2.9.0",
+    "tokenizers==0.21.*",
+    "numpy==2.*",
+    "safetensors==0.5.*",
+    "pydantic==2.*",
+    "pyyaml==6.*",
+    "scikit-learn==1.6.*",
+    "blake3==1.*",
+    "tqdm",
+]
+
+[dependency-groups]
+dev = ["pytest==8.*", "ruff"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lemma"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

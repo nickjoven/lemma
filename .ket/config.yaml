@@ -1,0 +1,9 @@
+{
+  "agents": {
+    "claude": {
+      "cli_command": "claude -p --output-format json",
+      "mcp_capable": true,
+      "model": "claude-sonnet-4-5-20250929"
+    }
+  }
+}
