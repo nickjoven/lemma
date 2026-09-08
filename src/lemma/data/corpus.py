@@ -26,6 +26,12 @@ class CorpusError(RuntimeError):
     pass
 
 
+def encoder_text(row) -> str:
+    """The statement string the encoder sees: the compact readable form when
+    present, else the pp.all canonical form (older corpora)."""
+    return row.readable_pp or row.canonical_type
+
+
 def load_manifest() -> dict:
     if not MANIFEST.exists():
         raise CorpusError(f"no corpus manifest at {MANIFEST}")

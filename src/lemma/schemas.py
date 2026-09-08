@@ -18,7 +18,8 @@ class DeclarationRow(BaseModel):
     name: str
     module: str
     kind: Literal["theorem", "def", "axiom", "opaque", "inductive"]
-    canonical_type: str
+    canonical_type: str          # pp.all — the lock's identity form
+    readable_pp: Optional[str] = None  # default ppExpr — the compact encoder input
     lock: str
     hash_algo: Literal["blake3", "blake2b"] = "blake3"
     type_consts_std: list[str] = Field(default_factory=list)

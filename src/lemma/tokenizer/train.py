@@ -84,9 +84,11 @@ def main() -> int:
     ap.add_argument("--holdout", type=int, default=2_000)
     args = ap.parse_args()
 
-    from ..data.corpus import iter_rows
+    from ..data.corpus import encoder_text, iter_rows
 
-    statements = [r.canonical_type for r in iter_rows("declarations")]
+    # Train on the readable form (the encoder input); fall back to pp.all for a
+    # corpus predating the readable_pp field.
+    statements = [encoder_text(r) for r in iter_rows("declarations")]
     held_out, train = statements[: args.holdout], statements[args.holdout:]
 
     tok = build_tokenizer()
