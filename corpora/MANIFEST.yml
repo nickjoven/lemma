@@ -1,0 +1,101 @@
+source:
+  repo: quod
+  run_id: full-20260908
+  manifest_cid: 89d04044c60abbc2969a5f28f8a54405f8bdf0c34f0c3bef6745483e60327632
+  pin:
+    lean_toolchain: leanprover/lean4:v4.28.0
+    crouzeix:
+      mathlib: 8f9d9cff
+      jin: f9d5c8d
+corpora:
+  declarations:
+  - file: declarations/declarations-0000.jsonl
+    cid: 4e7e59bb2b5acaeee2e4416341dc6100a9e9089f0553b4096275c367b440284c
+    records: 10000
+  - file: declarations/declarations-0001.jsonl
+    cid: e4e974cda12eb025a6386109b35b74f8d67bf8b7788768b086f5aa65be4a2d9b
+    records: 10000
+  - file: declarations/declarations-0002.jsonl
+    cid: 5a7f645519bc9cd5c2ba6ffce2bfe490bebf91afc20bd3ad4c7e9ea4846d1266
+    records: 10000
+  - file: declarations/declarations-0003.jsonl
+    cid: cb17a246b2fccde9f28e24b4ea45b0f8c12ff675141e68d3dcb60e990386e9d6
+    records: 10000
+  - file: declarations/declarations-0004.jsonl
+    cid: 3bd76f733203fdb2b589cec4978b8960c0ce905aecd6804f20f8f8f4ae8abe2b
+    records: 10000
+  - file: declarations/declarations-0005.jsonl
+    cid: d71f17a107b69f761802bec6064be347205bf01676d7509bed2f69debda1e585
+    records: 10000
+  - file: declarations/declarations-0006.jsonl
+    cid: 4cf062754b4b60640e2a7d6f74b45f885680d7fc36f240af744d529c6ba3864b
+    records: 10000
+  - file: declarations/declarations-0007.jsonl
+    cid: c19aa16225ec1bdaa3211d5a11c002f31a587ede9c5ad61e052fb396035d2158
+    records: 10000
+  - file: declarations/declarations-0008.jsonl
+    cid: cf4d7a9e54467ee531095282ac1637e9a545aefca1066851a35761accb2dd584
+    records: 10000
+  - file: declarations/declarations-0009.jsonl
+    cid: 84312ee111baf1f883c8353cfb9f1628e402d680332cab5ba12836e6de1bce67
+    records: 10000
+  - file: declarations/declarations-0010.jsonl
+    cid: 6a099c61df665f6ccbfccaa67e1cf506766a0ade4c63011cb5774018af06c8df
+    records: 10000
+  - file: declarations/declarations-0011.jsonl
+    cid: ac1a11499656c88361467778c4022ac175fcebf152e04879dedf15fc56e4117e
+    records: 10000
+  - file: declarations/declarations-0012.jsonl
+    cid: 39be49a49c85bbf4805e4f479735f4db999d2a3b54c50d017bcc8d173a8a4a18
+    records: 10000
+  - file: declarations/declarations-0013.jsonl
+    cid: d462f90dd742b31f34eec71ebc9695906540afa53bec5c7350267129f60e8fef
+    records: 10000
+  - file: declarations/declarations-0014.jsonl
+    cid: da85d8bd66dc7737f6148085b2f28863a450e661ad8f67d1e7af750f8e6bf82e
+    records: 10000
+  - file: declarations/declarations-0015.jsonl
+    cid: 858f82030da194e66f2ae76365ce1dde178f4d3530d03f14305aaaf08c3157e8
+    records: 10000
+  - file: declarations/declarations-0016.jsonl
+    cid: dc4fd2c3e2693c5ee07fa786908ba0768182c8c606db25f9b1a89c0d15c2f35f
+    records: 10000
+  - file: declarations/declarations-0017.jsonl
+    cid: 721fcb8aeb8537c0d6f334ffac9b5d25f3c17c8bde2d4b58724e7731b7fcdbf0
+    records: 10000
+  - file: declarations/declarations-0018.jsonl
+    cid: 90d88fccb9ef162b39c5568a16b152d3664f652396ba1280af27cad96a841bd8
+    records: 10000
+  - file: declarations/declarations-0019.jsonl
+    cid: 494775e1c24c210bba24a64b31a7f21e2399eba8f854e70fe179290aa9c35ddc
+    records: 10000
+  - file: declarations/declarations-0020.jsonl
+    cid: beeee13005e733d9463e740eb6ffd3f340f285d38268d0397d27485b3264f3fa
+    records: 10000
+  - file: declarations/declarations-0021.jsonl
+    cid: 5f23c652be75bd8b21985c0f88031601d7cd92f246a84257f81913970f649c00
+    records: 10000
+  - file: declarations/declarations-0022.jsonl
+    cid: f45820a510fd3f0e49b4cca19648c0d74813eeb6c0e32a342c33c75519ad526c
+    records: 10000
+  - file: declarations/declarations-0023.jsonl
+    cid: a7c602fb339b54ab572189c9c7cd92eb97d7bff59150ffebf6b3361ccd90fa6b
+    records: 10000
+  - file: declarations/declarations-0024.jsonl
+    cid: ce12ec4488c0c0552cfb7fd6368725c1e43e8665d598dda9b6636b9669a96842
+    records: 10000
+  - file: declarations/declarations-0025.jsonl
+    cid: 46e25f91c4564221ba9e60004f6ea81b5d530725bea5ed40efc73f84398606dd
+    records: 10000
+  - file: declarations/declarations-0026.jsonl
+    cid: d3db5af9b87d68265a473acfc21b17d77cc30fdb44bfb1ad08fccd3f0f202adc
+    records: 10000
+  - file: declarations/declarations-0027.jsonl
+    cid: 7ff474d62e29bad7daaac5450eef89fca2df9e78942abc33ec5995a722f7ad66
+    records: 10000
+  - file: declarations/declarations-0028.jsonl
+    cid: a999d78d785c302af6fc7bbd4966b3fe73aa46148d6a7b1a5fddaa72bd285ad2
+    records: 10000
+  - file: declarations/declarations-0029.jsonl
+    cid: 9ff5c7b1c41ad40295e0528625781782fac814505a4e36434c87f059ed968aa8
+    records: 7791
