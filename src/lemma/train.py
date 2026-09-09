@@ -89,8 +89,13 @@ def main() -> int:
 
     def save_ckpt(path: Path) -> None:
         base = getattr(model, "_orig_mod", model)
-        save_file({**{f"encoder.{k}": v for k, v in base.state_dict().items()},
-                   **{f"head.{k}": v for k, v in head.state_dict().items()}}, str(path))
+        d = {**{f"encoder.{k}": v for k, v in base.state_dict().items()},
+             **{f"head.{k}": v for k, v in head.state_dict().items()}}
+        # head.decoder.weight IS encoder.embed.weight (tied); safetensors refuses
+        # shared-memory tensors, and it is reconstructed by re-tying on load.
+        # This crashed the first rolling checkpoint at step 2000 on 2026-09-09.
+        d.pop("head.decoder.weight", None)
+        save_file(d, str(path))
 
     # Rolling on-disk checkpoint. A 12h42m run was lost on 2026-09-09 because
     # the only save was at the final step; a kill (or reboot) must never cost
