@@ -59,9 +59,11 @@ def main() -> int:
             model = torch.compile(model)
         except Exception as e:  # WSL2/triton papercuts: fall back, loudly
             print(f"torch.compile failed ({e}); continuing eager")
-    opt = torch.optim.AdamW(
-        list(model.parameters()) + list(head.parameters()),
-        lr=float(cfg.get("lr", 3e-4)), weight_decay=0.01, betas=(0.9, 0.98))
+    # Dedup: MLMHead ties its decoder weight to the encoder embedding, so the
+    # tied tensor appears in both parameter lists — pass each tensor once.
+    params = list({id(p): p for p in [*model.parameters(), *head.parameters()]}.values())
+    opt = torch.optim.AdamW(params, lr=float(cfg.get("lr", 3e-4)),
+                            weight_decay=0.01, betas=(0.9, 0.98))
 
     rec = ledger.start_run(ledger.RunRecord(
         run_id=run_id, kind="train", stage="S2", started=ledger.now_iso(),
@@ -78,10 +80,28 @@ def main() -> int:
     rng = np.random.default_rng(cfg.get("seed", 1337))
     batch_size = cfg.get("batch_size", 96)
     steps = cfg.get("steps", 10_000)
+    ckpt_every = cfg.get("ckpt_every", 2000)
     mask_id = tok.token_to_id("<mask>")
     losses, accs = [], []
+    ckpt_dir = REPO_ROOT / "runs" / "ckpts"
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    from safetensors.torch import save_file
+
+    def save_ckpt(path: Path) -> None:
+        base = getattr(model, "_orig_mod", model)
+        save_file({**{f"encoder.{k}": v for k, v in base.state_dict().items()},
+                   **{f"head.{k}": v for k, v in head.state_dict().items()}}, str(path))
+
+    # Rolling on-disk checkpoint. A 12h42m run was lost on 2026-09-09 because
+    # the only save was at the final step; a kill (or reboot) must never cost
+    # more than ckpt_every steps again. Only the FINAL checkpoint is ket-put —
+    # periodic ones overwrite one file so disk/CAS don't fill with 30 copies.
+    rolling = ckpt_dir / f"{run_id}-latest.safetensors"
     model.train()
     for step in range(steps):
+        if step > 0 and step % ckpt_every == 0:
+            save_ckpt(rolling)
+            print(f"step {step}: rolling checkpoint -> {rolling.name}", flush=True)
         idx = rng.integers(0, len(cache), size=batch_size)
         ids = collate([cache[int(i)] for i in idx], enc_cfg.pad_id, enc_cfg.max_seq).to(device)
         corrupted, labels = span_mask(ids, enc_cfg.pad_id, mask_id, enc_cfg.vocab_size)
@@ -95,15 +115,14 @@ def main() -> int:
         losses.append(loss.item())
         if step % 100 == 0:
             accs.append(masked_accuracy(logits.float(), labels))
-            print(f"step {step}: loss {np.mean(losses[-100:]):.4f} acc {accs[-1]:.4f}")
+            # flush: the run is detached with stdout redirected to a file, and
+            # block-buffering would hide progress for thousands of steps
+            print(f"step {step}: loss {np.mean(losses[-100:]):.4f} acc {accs[-1]:.4f}", flush=True)
 
-    ckpt = REPO_ROOT / "runs" / "ckpts" / f"{run_id}.safetensors"
-    ckpt.parent.mkdir(parents=True, exist_ok=True)
-    from safetensors.torch import save_file
-    base = getattr(model, "_orig_mod", model)
-    save_file({**{f"encoder.{k}": v for k, v in base.state_dict().items()},
-               **{f"head.{k}": v for k, v in head.state_dict().items()}}, str(ckpt))
+    ckpt = ckpt_dir / f"{run_id}.safetensors"
+    save_ckpt(ckpt)
     rec.checkpoint_cids.append(ledger.ket_put(ckpt.read_bytes()))
+    rolling.unlink(missing_ok=True)
 
     ledger.finish_run(rec, metrics={
         "final_loss": float(np.mean(losses[-100:])),

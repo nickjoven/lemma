@@ -19,7 +19,9 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .schemas import RunRecord
+from .schemas import RunInputs, RunRecord  # re-exported for callers (train.py uses ledger.RunInputs)
+
+__all__ = ["RunInputs", "RunRecord"]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 KET_HOME = Path(os.environ.get("LEMMA_KET_HOME", REPO_ROOT / ".ket"))

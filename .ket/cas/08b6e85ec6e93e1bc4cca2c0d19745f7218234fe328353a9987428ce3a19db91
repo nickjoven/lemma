@@ -10,9 +10,8 @@ tokenizer_path: runs/tokenizer/lean-unigram-32k.json
 cache_dir: corpora/cache
 cache_name: declarations-train
 seed: 1337
-batch_size: 64
+batch_size: 96
 steps: 60000
-ckpt_every: 2000
 lr: 3.0e-4
 compile: false
 encoder:
