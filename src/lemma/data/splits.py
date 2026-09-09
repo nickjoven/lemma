@@ -26,13 +26,19 @@ SPLITS = ("train", "val", "test")
 WEIGHTS = (0.90, 0.05, 0.05)
 
 
-def area_of(module: str) -> str:
-    parts = module.split(".")
-    return ".".join(parts[:2]) if len(parts) >= 2 else module
+def split_key(module: str) -> str:
+    """The unit of split assignment: the full module path. Splitting by
+    top-level area (Mathlib.X) instead left only ~50 units, so a 90/5/5 split
+    was lumpy (val came out empty) and held out whole subfields — too coarse
+    for a pretraining encoder. The full module keeps same-file declarations
+    together (a sound leakage boundary) while giving thousands of units that
+    partition cleanly. Cross-module dependency overlap is disclosed, not hidden
+    (train_test_dep_jaccard in the manifest)."""
+    return module
 
 
-def split_of_area(area: str) -> str:
-    h = int.from_bytes(blake3.blake3(area.encode()).digest()[:8], "big") / 2**64
+def split_of_area(module: str) -> str:
+    h = int.from_bytes(blake3.blake3(split_key(module).encode()).digest()[:8], "big") / 2**64
     acc = 0.0
     for name, w in zip(SPLITS, WEIGHTS):
         acc += w
@@ -49,7 +55,7 @@ def assign(rows: list[DeclarationRow]) -> dict[str, str]:
         if row.lock in by_lock:
             out[row.name] = by_lock[row.lock]
         else:
-            s = split_of_area(area_of(row.module))
+            s = split_of_area(row.module)
             out[row.name] = s
             by_lock[row.lock] = s
     return out

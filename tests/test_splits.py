@@ -11,10 +11,18 @@ def decl(name, module, lock, deps=()):
     )
 
 
-def test_same_area_same_split():
-    rows = [decl(f"d{i}", f"Mathlib.Topology.Sub{i}", f"l{i}") for i in range(20)]
+def test_same_module_same_split():
+    # all declarations in ONE module land in one split (same-file leakage guard)
+    rows = [decl(f"d{i}", "Mathlib.Topology.Basic", f"l{i}") for i in range(20)]
     got = splits.assign(rows)
     assert len(set(got.values())) == 1
+
+
+def test_many_modules_populate_all_splits():
+    # module-level (not area-level) granularity fills train/val/test, not lumpy
+    rows = [decl(f"d{i}", f"Mathlib.Area.Mod{i}", f"l{i}") for i in range(3000)]
+    got = splits.assign(rows)
+    assert set(got.values()) == set(splits.SPLITS)
 
 
 def test_shared_lock_never_crosses_split():

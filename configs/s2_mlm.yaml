@@ -3,13 +3,14 @@
 # tokenizer before the first real run; the ledger refuses to compare metrics
 # across a different (mathlib_pin, tokenizer_cid) pair.
 mathlib_pin: "crouzeix:v4.28.0:8f9d9cff"
-corpus_cids: []   # filled from corpora/MANIFEST.yml shard CIDs at run time
-tokenizer_cid: "5b876e0b97924a7ed799e5453190a31a5ef09412956a07524ad023cfaa08e478"
+# corpus version = the source manifest CID (corpus full-20260908b, readable_pp)
+corpus_cids: ["c6ad843fb81f6f1e542df40480be3c4b538b7748c9554528b179d708d3ba029c"]
+tokenizer_cid: "3b33be812ca5991f454b242b7d6fc05512f582384f7d23792ef64a0944a620d4"
 tokenizer_path: runs/tokenizer/lean-unigram-32k.json
 cache_dir: corpora/cache
 cache_name: declarations-train
 seed: 1337
-batch_size: 48
+batch_size: 96
 steps: 60000
 lr: 3.0e-4
 compile: true
@@ -18,7 +19,6 @@ encoder:
   n_layers: 8
   n_heads: 8
   d_ff: 2048
-  # pp.all canonical forms are long (p50=479 tokens; 47.5% exceed 512, 23.6%
-  # exceed 1024). Until/unless a readable-pp corpus field lands, S2 runs at
-  # 1024 to cut truncation to ~24%; batch dropped to 48 to fit the 4070.
-  max_seq: 1024
+  # readable_pp tokenizes to p50=88 / p99=309 tokens; only 0.17% exceed 512,
+  # so seq 512 is comfortable (the pp.all 1024/batch-48 stopgap is retired).
+  max_seq: 512
