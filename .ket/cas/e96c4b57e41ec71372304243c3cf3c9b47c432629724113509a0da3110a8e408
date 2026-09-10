@@ -1,0 +1,10 @@
+{
+ "metrics": {
+  "final_loss": 4.540459696451823,
+  "in_batch_acc": 0.0078125,
+  "logit_scale": 14.24421215057373,
+  "steps": 30,
+  "train_pairs": 63812
+ },
+ "run_id": "s3-smoke"
+}
