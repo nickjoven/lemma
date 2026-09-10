@@ -1,0 +1,9 @@
+{
+ "metrics": {
+  "final_loss": 0.2816582977771759,
+  "masked_acc": 0.9316831827163696,
+  "steps": 60000,
+  "truncation_rate": 0.0051
+ },
+ "run_id": "s2-mlm-20260909-141736"
+}

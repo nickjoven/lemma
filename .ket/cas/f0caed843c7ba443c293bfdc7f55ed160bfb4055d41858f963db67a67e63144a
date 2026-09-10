@@ -1,0 +1,23 @@
+{
+ "controls": [
+  {
+   "expect": "MRR>=0.95",
+   "id": "same-lock-retrieval",
+   "observed": 0.9920698886921901,
+   "ok": true
+  },
+  {
+   "expect": "top1<0.05",
+   "id": "cross-module-negative",
+   "observed": 0.0005,
+   "ok": true
+  },
+  {
+   "expect": ">=25",
+   "id": "beats-unigram-by-25pts",
+   "observed": 65.9,
+   "ok": true
+  }
+ ],
+ "pass": true
+}

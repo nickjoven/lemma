@@ -126,8 +126,18 @@ def main() -> int:
 
     ckpt = ckpt_dir / f"{run_id}.safetensors"
     save_ckpt(ckpt)
-    rec.checkpoint_cids.append(ledger.ket_put(ckpt.read_bytes()))
+    cid = ledger.ket_put(ckpt.read_bytes())
+    rec.checkpoint_cids.append(cid)
     rolling.unlink(missing_ok=True)
+    # .ket/ is git-tracked (federation model) but a 126 MB checkpoint blob
+    # exceeds GitHub's 100 MB file limit and rejected the push on 2026-09-10.
+    # The CID stays resolvable locally via `ket get` (provenance intact); the
+    # bytes are kept out of git. Manifests and CIDs travel; weights do not.
+    gi = REPO_ROOT / ".gitignore"
+    line = f".ket/cas/{cid}"
+    if line not in gi.read_text().splitlines():
+        with open(gi, "a") as f:
+            f.write(f"{line}\n")
 
     ledger.finish_run(rec, metrics={
         "final_loss": float(np.mean(losses[-100:])),

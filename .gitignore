@@ -7,3 +7,4 @@ runs/ckpts/
 runs/*.tmp
 .pytest_cache/
 .ruff_cache/
+.ket/cas/b2a83ed2054546d4407d28227e44782f1f50ac4631fa51f15f82d0b624776796

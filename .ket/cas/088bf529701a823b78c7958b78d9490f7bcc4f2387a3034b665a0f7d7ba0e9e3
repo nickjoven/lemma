@@ -1,0 +1,17 @@
+{
+ "metrics": {
+  "groups": 2000,
+  "masked_acc_margin_pts": 65.9,
+  "masked_acc_model": 0.9317,
+  "masked_acc_unigram_baseline": 0.2731,
+  "mrr_gate": 0.95,
+  "neg_cross_module_top1_rate": 0.0005,
+  "pass_margin": true,
+  "pass_mrr": true,
+  "pool": 14741,
+  "queries": 4741,
+  "same_lock_hit@1": 0.9884,
+  "same_lock_mrr": 0.9921
+ },
+ "run_id": "s2-eval-s2-mlm-20260909-141736"
+}
