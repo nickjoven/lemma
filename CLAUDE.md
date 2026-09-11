@@ -26,6 +26,12 @@ uv-managed, python 3.12 pinned, `torch==2.9.0` from the cu128 index (RTX
 4070). `uv sync --frozen` reproduces it; `uv.lock` gets a CID in run records.
 Run everything as `uv run ...`. No transformers/datasets/lightning by design.
 
+## Known problems
+
+`OPEN.yml` is the problem ledger (quod's format, L-1..). A known gap that is
+not listed there is a defect of the ledger. Every failed stage gate gets an
+entry with its run/eval CIDs and the decided-or-pending fix.
+
 ## Stages
 
 S0 harness → S1 tokenizer (Unigram 24k, byte-fallback, frozen+CID'd) →

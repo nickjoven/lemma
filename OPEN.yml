@@ -1,0 +1,59 @@
+# Every known problem with the ML track, in view. Rule (inherited from quod,
+# 2026-09-06): a gap that is known and unlisted is a defect of this ledger,
+# not of the gap.
+# status: open | fix-pending (code written, run not yet recorded) | closed <date> <how>
+# severity: high = a cited metric can be wrong or unreproducible; medium = a
+#           capability gap or a failed stage gate; low = cost, ergonomics, or
+#           a by-design limit worth stating.
+- id: L-1
+  severity: medium
+  status: open
+  title: S3 gloss tower is representation-limited; same-module hard-drift AUC 0.807 < 0.90 gate
+  detail: >
+    Two S3 runs failed the gate on held-out modules. v1 (s3-gloss-20260910-174141,
+    eval ca34a4b7...): hard AUC 0.767, retrieval MRR 0.398. v2 with module-grouped
+    hard-negative batches and val early stopping (s3-gloss-20260911-012141, eval
+    3d8a926c...): hard AUC 0.807, retrieval MRR 0.400 — mining gave +0.04 but the
+    val probe saturated at ~0.84 and retrieval did not move at all. The statement
+    tower is strong (S2 same-lock MRR 0.992); the gloss tower is the limit: English
+    docstrings are byte-fallbacked by the Lean-only tokenizer (CID 3b33be81...) and
+    the shared encoder was MLM-pretrained on Lean statements only. This is a
+    representation deficit, not a tuning gap. The model remains useful for gross
+    prose/statement mismatch (easy-drift AUC 0.977; 93.7% of matched pairs clear
+    the 90th percentile of random mismatches), which is the practical quod Q-5 case.
+  fix: >
+    Either (a) a gloss-capable tokenizer trained on docstrings+statements and an
+    MLM pretraining pass over both (a NEW tokenizer pin — changes the corpus
+    contract for every downstream stage, so do it deliberately, not mid-stream), or
+    (b) a pinned external prose encoder for the gloss tower with its checkpoint
+    content-addressed — a doctrine decision (the plan excluded external artifacts).
+    Decided 2026-09-11: record and move on; revisit with (a) when a tokenizer
+    re-pin is planned.
+- id: L-2
+  severity: medium
+  status: open
+  title: S3's exact drift eval (docstring x gate-verified mutant) is deferred
+  detail: >
+    The plan's S3 criterion pairs a docstring with a gate-verified MUTANT of its
+    statement. That corpus (Phase 3: mutants.jsonl with gate verdicts) is not
+    built, so evaluate_s3.py gates on the strongest mutant-free proxy — same-module
+    hard negatives — and records the exact test as deferred in every eval record.
+  fix: build the Phase-3 mutant corpus (see L-3), then add the mutant-pair AUC to
+    evaluate_s3.py as the primary gate.
+- id: L-3
+  severity: medium
+  status: open
+  title: S4 (mutant verdict predictor) is blocked on the Phase-3 mutant corpus
+  detail: >
+    No mutants.jsonl exists. It requires an Expr-level mutation walker in quod
+    (binder-level hypothesis deletion, curated constant swaps, sorry/axiom
+    injection) with per-mutant gate labels (lock_changed -> elaborates ->
+    gate_verdict). CPU/Lean-bound; parallelizable with GPU training. Also
+    unblocks L-2.
+- id: L-4
+  severity: low
+  status: open
+  title: tokenizer file is named 32k but has ~14.9k effective pieces
+  detail: The Unigram trainer converged to 14,869 pieces on the compact readable_pp
+    corpus; the model sizes itself to the true vocab, so this is correct behaviour.
+    The filename runs/tokenizer/lean-unigram-32k.json is a nominal misnomer only.
