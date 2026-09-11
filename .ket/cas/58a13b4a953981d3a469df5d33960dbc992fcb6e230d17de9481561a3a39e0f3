@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "title": "lemma: S1-S5 attempted; prover-in-the-loop is the next unlock",
+  "summary": "State 2026-09-11. Corpus v2 c6ad843f (296,187 decls, readable_pp); tokenizer 3b33be81; mutants 06622cff (19,007 over 5,410 parents). S2 PASS (same-lock MRR 0.992; ckpt b2a83ed2). S5 PASS (known-Iff MRR 0.564; 100 proposals f865e4ea, boilerplate-heavy: L-5). S3 FAIL x2 (hard-drift AUC 0.807 lt 0.90; gloss tower limited by Lean-only tokenizer: L-1). S4 partial (elab F1 0.941 but +6.1 over bag-of-tokens, OOD 0.305: L-6; real target is gate_verdict). Next steps all need a prover-in-the-loop (Phase-3b proof attempts; gate submission of proposals) or a decision (S3 tokenizer re-pin; JEPA proper). Ledger runs/ledger.jsonl; problems OPEN.yml; all repos pushed.",
+  "artifacts": [
+    {
+      "name": "OPEN.yml",
+      "cid": "3a35685142682694a427a86e0e1f6aefd11fe5048875e4c2c0302c9943fc429c"
+    }
+  ],
+  "meta": {
+    "catbus_packet": "true"
+  },
+  "cdom": null
+}

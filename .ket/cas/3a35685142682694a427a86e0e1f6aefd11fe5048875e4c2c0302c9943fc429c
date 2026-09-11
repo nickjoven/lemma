@@ -1,0 +1,102 @@
+# Every known problem with the ML track, in view. Rule (inherited from quod,
+# 2026-09-06): a gap that is known and unlisted is a defect of this ledger,
+# not of the gap.
+# status: open | fix-pending (code written, run not yet recorded) | closed <date> <how>
+# severity: high = a cited metric can be wrong or unreproducible; medium = a
+#           capability gap or a failed stage gate; low = cost, ergonomics, or
+#           a by-design limit worth stating.
+- id: L-1
+  severity: medium
+  status: open
+  title: S3 gloss tower is representation-limited; same-module hard-drift AUC 0.807 < 0.90 gate
+  detail: >
+    Two S3 runs failed the gate on held-out modules. v1 (s3-gloss-20260910-174141,
+    eval ca34a4b7...): hard AUC 0.767, retrieval MRR 0.398. v2 with module-grouped
+    hard-negative batches and val early stopping (s3-gloss-20260911-012141, eval
+    3d8a926c...): hard AUC 0.807, retrieval MRR 0.400 — mining gave +0.04 but the
+    val probe saturated at ~0.84 and retrieval did not move at all. The statement
+    tower is strong (S2 same-lock MRR 0.992); the gloss tower is the limit: English
+    docstrings are byte-fallbacked by the Lean-only tokenizer (CID 3b33be81...) and
+    the shared encoder was MLM-pretrained on Lean statements only. This is a
+    representation deficit, not a tuning gap. The model remains useful for gross
+    prose/statement mismatch (easy-drift AUC 0.977; 93.7% of matched pairs clear
+    the 90th percentile of random mismatches), which is the practical quod Q-5 case.
+  fix: >
+    Either (a) a gloss-capable tokenizer trained on docstrings+statements and an
+    MLM pretraining pass over both (a NEW tokenizer pin — changes the corpus
+    contract for every downstream stage, so do it deliberately, not mid-stream), or
+    (b) a pinned external prose encoder for the gloss tower with its checkpoint
+    content-addressed — a doctrine decision (the plan excluded external artifacts).
+    Decided 2026-09-11: record and move on; revisit with (a) when a tokenizer
+    re-pin is planned.
+- id: L-2
+  severity: medium
+  status: open
+  title: S3's exact drift eval (docstring x gate-verified mutant) is deferred
+  detail: >
+    The plan's S3 criterion pairs a docstring with a gate-verified MUTANT of its
+    statement. That corpus (Phase 3: mutants.jsonl with gate verdicts) is not
+    built, so evaluate_s3.py gates on the strongest mutant-free proxy — same-module
+    hard negatives — and records the exact test as deferred in every eval record.
+  fix: build the Phase-3 mutant corpus (see L-3), then add the mutant-pair AUC to
+    evaluate_s3.py as the primary gate.
+- id: L-3
+  severity: medium
+  status: closed 2026-09-11 by quod corpus mutants-20260911 (manifest CID 06622cff...7f57), 19,007 mutants over 5,410 sampled theorems, Phase-3a labels (elaborates, lock_changed, operator; proof-side verdicts by construction). Statement-mutant gate_verdict remains Phase-3b (see L-2).
+  title: S4 (mutant verdict predictor) is blocked on the Phase-3 mutant corpus
+  detail: >
+    No mutants.jsonl exists. It requires an Expr-level mutation walker in quod
+    (binder-level hypothesis deletion, curated constant swaps, sorry/axiom
+    injection) with per-mutant gate labels (lock_changed -> elaborates ->
+    gate_verdict). CPU/Lean-bound; parallelizable with GPU training. Also
+    unblocks L-2.
+- id: L-5
+  severity: medium
+  status: open
+  title: S5 proposals ranked by raw cosine are dominated by boilerplate near-duplicates
+  detail: >
+    S5 passed its gate (s5-equiv-20260911-125959, eval 1a0ed42c...: known-Iff
+    MRR 0.564 >= 0.5, dedup 0.974, permutation 0.496) and emitted 100 novel
+    proposals (CID f865e4ea...). But the top of that list is score-1.000 pairs
+    inside one namespace (Algebra.Generators.Hom.*: congr_simp / equivAlgHom_*
+    / comp_id) — auto-generated lemma variants with near-identical readable
+    forms, not non-obvious equivalences. Submitting these to the gates would
+    mostly confirm trivialities. The plan's real test (>= 10 of top 100
+    discharged) is only meaningful on a list that excludes such pairs.
+  fix: before gate submission, rerank proposals with a lexical-overlap penalty
+    (e.g. token-Jaccard of the readable forms) and a same-namespace / same-
+    module penalty, and require distinct locks whose canonical forms differ
+    beyond binder names; then re-emit and submit. Gate submission itself needs
+    a prover-in-the-loop (the gates verify a given proof; they do not find one)
+    — a separate stage to design.
+- id: L-6
+  severity: medium
+  status: open
+  title: S4 v1 elaborates-predictor beats the bag-of-tokens baseline by only 6 pts and collapses on an unseen operator
+  detail: >
+    Run s4-verdict-20260911-152400 (sealed 40a2b7f7..., best val F1 0.936 @
+    1500), held-out eval 3690e8f2... (calibration_failed): elaborates macro-F1
+    0.941 (gate 0.80 PASS) but a bag-of-tokens logistic baseline reaches 0.880
+    (+6.1 pts, gate >= 10 FAIL), and on the held-out operator swap_lit_01 the
+    model scores 0.305 macro-F1 (near one-class). Operator identification 0.850.
+    Reading: the Phase-3a `elaborates` label is largely LEXICALLY predictable for
+    these operators (a `0` beside a `ℕ+`), so the task is too easy for a trivial
+    baseline and the model learns operator-specific surface patterns rather than
+    a general notion of well-typedness — exactly the distribution-shift failure
+    the plan's OOD control exists to expose. Test n is small (326 IID / 65 OOD;
+    5% module split of 8,187 statement mutants).
+  fix: >
+    (a) the substantive target is `gate_verdict` on statement mutants (does the
+    mutated claim still hold?), which needs Phase-3b proof attempts (L-2) — a
+    prover-in-the-loop stage; (b) a larger mutant sample (sample_mod 46 -> ~10)
+    for a usable test set; (c) operators that are not lexically trivial
+    (e.g. hypothesis WEAKENING/STRENGTHENING, quantifier swaps) so the baseline
+    cannot shortcut. Until then, cite S4 only as "operator-conditional elaborates
+    on this mutant distribution", never as a verdict predictor.
+- id: L-4
+  severity: low
+  status: open
+  title: tokenizer file is named 32k but has ~14.9k effective pieces
+  detail: The Unigram trainer converged to 14,869 pieces on the compact readable_pp
+    corpus; the model sizes itself to the true vocab, so this is correct behaviour.
+    The filename runs/tokenizer/lean-unigram-32k.json is a nominal misnomer only.

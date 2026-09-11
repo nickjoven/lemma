@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "title": "lemma: S1-S5 attempted; prover-in-the-loop is the next unlock",
+  "summary": "State 2026-09-11. Corpus v2 c6ad843f (296,187 decls, readable_pp); tokenizer 3b33be81; mutants 06622cff (19,007 over 5,410 parents). S2 PASS (same-lock MRR 0.992; ckpt b2a83ed2). S5 PASS (known-Iff MRR 0.564; 100 proposals f865e4ea, boilerplate-heavy: L-5). S3 FAIL x2 (hard-drift AUC 0.807 lt 0.90; gloss tower limited by Lean-only tokenizer: L-1). S4 partial (elab F1 0.941 but +6.1 over bag-of-tokens, OOD 0.305: L-6; real target is gate_verdict). Next steps all need a prover-in-the-loop (Phase-3b proof attempts; gate submission of proposals) or a decision (S3 tokenizer re-pin; JEPA proper). Ledger runs/ledger.jsonl; problems OPEN.yml; all repos pushed.",
+  "artifacts": [
+    {
+      "name": "OPEN.yml",
+      "cid": "3a35685142682694a427a86e0e1f6aefd11fe5048875e4c2c0302c9943fc429c"
+    },
+    {
+      "name": "ledger.jsonl",
+      "cid": "f952f0ad1aed810f10c41dac89b86e69b6fed0fb680a33d19fef7b33ed105577"
+    },
+    {
+      "name": "MANIFEST.yml",
+      "cid": "eed152d8bcdf50c2cf99ee90b46fb7c1456ac5eb33e20390a97a26b20c05f8bb"
+    },
+    {
+      "name": "s2_mlm.yaml",
+      "cid": "26e931f17c27e9cccea8e675c0c97d1af5594933a2cf945a24184fc97a8893f1"
+    },
+    {
+      "name": "s3_gloss.yaml",
+      "cid": "401067123984cae29657e87fbaa4a591e85abb71633b6e79afe9030ed6e213ed"
+    },
+    {
+      "name": "s4_verdict.yaml",
+      "cid": "bfc2e285f8af6b0c0d766037c583e486db16248a4a1bcc0c6dc10ac72a7dbb61"
+    },
+    {
+      "name": "s5_equiv.yaml",
+      "cid": "cc9753f0118ad26916fffada1adca2555de31e75d51261b9e69c91df1372ed2a"
+    },
+    {
+      "name": "CLAUDE.md",
+      "cid": "b70e94b87afd3b7067038836fd439ea0cecd59b4f6343b83b9eea5d130dfa9cb"
+    }
+  ],
+  "meta": {
+    "catbus_packet": "true",
+    "gpu": "RTX4070",
+    "stage": "S1-S5"
+  },
+  "cdom": null
+}
