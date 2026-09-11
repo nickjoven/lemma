@@ -1,0 +1,23 @@
+{
+ "controls": [
+  {
+   "expect": "MRR>=0.5",
+   "id": "known-iff-retrieval",
+   "observed": 0.4200639220562988,
+   "ok": false
+  },
+  {
+   "expect": "0.45..0.55",
+   "id": "permutation-sanity",
+   "observed": 0.48711248293295545,
+   "ok": true
+  },
+  {
+   "expect": "reported (S2 was 0.99)",
+   "id": "dedup-regression",
+   "observed": 0.9777462484871758,
+   "ok": true
+  }
+ ],
+ "pass": false
+}

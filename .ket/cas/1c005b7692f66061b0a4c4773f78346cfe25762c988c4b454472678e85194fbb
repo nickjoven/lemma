@@ -1,0 +1,18 @@
+{
+ "metrics": {
+  "dedup_mrr": 0.9777,
+  "distractors": 2000,
+  "gate_submission": "pending: submit proposals as A<->B demonstranda to quod's gates (>=10/100 discharged is the plan's bar)",
+  "iff_mrr": 0.4201,
+  "iff_recall@1": 0.2927,
+  "iff_recall@10": 0.6626,
+  "matched_vs_random_auc": 0.9962,
+  "mrr_gate": 0.5,
+  "pass_mrr": false,
+  "permutation_auc": 0.4871,
+  "proposals": 10,
+  "proposals_cid": "aab036440a1d4c953c6a206c5806a5157b91b656327420c4bbaa03ca4b7e4f15",
+  "test_iff": 1633
+ },
+ "run_id": "s5-eval-s5-smoke"
+}

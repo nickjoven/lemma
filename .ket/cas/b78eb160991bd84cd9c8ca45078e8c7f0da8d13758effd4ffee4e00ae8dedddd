@@ -1,0 +1,13 @@
+{
+ "metrics": {
+  "best_step": 40,
+  "final_loss": 1.559830155968666,
+  "hard_negatives": "module-grouped batches, 4 per module",
+  "in_batch_acc": 0.5625,
+  "steps": 40,
+  "train_iff": 26348,
+  "train_pairs": 37365,
+  "val_iff_mrr_best": 0.6416
+ },
+ "run_id": "s5-smoke"
+}
