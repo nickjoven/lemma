@@ -37,7 +37,13 @@ from .models.heads import ClassifierHead
 from .train_s3 import load_s2_encoder, tokenize
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-OP_CLASSES = ["hyp_del", "swap_and_or", "swap_or_and", "swap_eq_ne", "swap_ne_eq", "swap_lit_01", "proof_side"]
+# Statement-mutation operators only. The proof-side records (sorry/axiom
+# injection) leave the statement UNCHANGED, so their elaborates label is
+# trivially True and carries no mutation signal: including them made 95% of
+# the elaborates task "predict True" (smoke val F1 0.4994 = the degenerate
+# one-class answer). S4 v1 trains on the 8,187 statement mutants (75/25
+# typed/ill-typed) and identifies among the six statement operators.
+OP_CLASSES = ["hyp_del", "swap_and_or", "swap_or_and", "swap_eq_ne", "swap_ne_eq", "swap_lit_01"]
 
 
 class VerdictModel(nn.Module):
@@ -63,6 +69,8 @@ def mutants_by_split(ood_operator: str | None):
         if s is None or m.elaborates is None:
             continue
         oc = m.op_class
+        if oc == "proof_side":
+            continue
         if ood_operator and oc == ood_operator and s != "test":
             continue
         out[s].append((m.mutated_type, int(m.elaborates), OP_CLASSES.index(oc), oc))

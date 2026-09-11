@@ -1,0 +1,11 @@
+{
+ "metrics": {
+  "best_step": 30,
+  "final_loss": 1.1499260584513347,
+  "ood_operator": "swap_lit_01",
+  "steps": 30,
+  "train_mutants": 5552,
+  "val_macro_f1_elab_best": 0.8063
+ },
+ "run_id": "s4-smoke2"
+}
