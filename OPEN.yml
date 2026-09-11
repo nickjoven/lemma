@@ -42,7 +42,7 @@
     evaluate_s3.py as the primary gate.
 - id: L-3
   severity: medium
-  status: open
+  status: closed 2026-09-11 by quod corpus mutants-20260911 (manifest CID 06622cff...7f57), 19,007 mutants over 5,410 sampled theorems, Phase-3a labels (elaborates, lock_changed, operator; proof-side verdicts by construction). Statement-mutant gate_verdict remains Phase-3b (see L-2).
   title: S4 (mutant verdict predictor) is blocked on the Phase-3 mutant corpus
   detail: >
     No mutants.jsonl exists. It requires an Expr-level mutation walker in quod

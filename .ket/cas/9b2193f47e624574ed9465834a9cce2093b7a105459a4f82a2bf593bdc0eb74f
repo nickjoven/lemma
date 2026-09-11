@@ -8,8 +8,8 @@ mutant_corpus_cids: ["06622cffb6eb737eb84d9b71d450678916fff818699b767ad7adedc9b3
 max_seq: 256
 seed: 1337
 batch_size: 64
-steps: 3000
-val_every: 500
+steps: 30
+val_every: 15
 lr_encoder: 3.0e-5
 lr_heads: 5.0e-4
 ood_operator: swap_lit_01

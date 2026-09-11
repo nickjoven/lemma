@@ -99,3 +99,15 @@ corpora:
   - file: declarations/declarations-0029.jsonl
     cid: 8d7c59f04fe83c8450a622af32619ce39c0dfb4ff58393da7580af8e7aaad55b
     records: 6187
+  mutants:
+  - file: mutants/mutants-0000.jsonl
+    cid: 960df412582c23c483b814141bfa6a1f5148ffbf9f2dfdf451505cd38fe1d277
+    records: 10000
+  - file: mutants/mutants-0001.jsonl
+    cid: 6e79a2b83a189174577fd96df04cb0660eea1dd82ee36708320da014dfd8fc0f
+    records: 9007
+sources:
+  mutants:
+    run_id: mutants-20260911
+    manifest_cid: 06622cffb6eb737eb84d9b71d450678916fff818699b767ad7adedc9b3dd7f57
+    sample_mod: 46
