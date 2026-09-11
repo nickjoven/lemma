@@ -1,0 +1,13 @@
+{
+ "metrics": {
+  "best_step": 6000,
+  "final_loss": 0.3250879487395287,
+  "hard_negatives": "module-grouped batches, 4 per module",
+  "in_batch_acc": 0.765625,
+  "steps": 6000,
+  "train_iff": 26348,
+  "train_pairs": 37365,
+  "val_iff_mrr_best": 0.5517
+ },
+ "run_id": "s5-equiv-20260911-125959"
+}

@@ -50,6 +50,25 @@
     injection) with per-mutant gate labels (lock_changed -> elaborates ->
     gate_verdict). CPU/Lean-bound; parallelizable with GPU training. Also
     unblocks L-2.
+- id: L-5
+  severity: medium
+  status: open
+  title: S5 proposals ranked by raw cosine are dominated by boilerplate near-duplicates
+  detail: >
+    S5 passed its gate (s5-equiv-20260911-125959, eval 1a0ed42c...: known-Iff
+    MRR 0.564 >= 0.5, dedup 0.974, permutation 0.496) and emitted 100 novel
+    proposals (CID f865e4ea...). But the top of that list is score-1.000 pairs
+    inside one namespace (Algebra.Generators.Hom.*: congr_simp / equivAlgHom_*
+    / comp_id) — auto-generated lemma variants with near-identical readable
+    forms, not non-obvious equivalences. Submitting these to the gates would
+    mostly confirm trivialities. The plan's real test (>= 10 of top 100
+    discharged) is only meaningful on a list that excludes such pairs.
+  fix: before gate submission, rerank proposals with a lexical-overlap penalty
+    (e.g. token-Jaccard of the readable forms) and a same-namespace / same-
+    module penalty, and require distinct locks whose canonical forms differ
+    beyond binder names; then re-emit and submit. Gate submission itself needs
+    a prover-in-the-loop (the gates verify a given proof; they do not find one)
+    — a separate stage to design.
 - id: L-4
   severity: low
   status: open
