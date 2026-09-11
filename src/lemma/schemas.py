@@ -44,6 +44,17 @@ class MutantRow(BaseModel):
     lock_changed: bool
     elaborates: Optional[bool] = None
     gate_verdict: Optional[str] = None
+    module: Optional[str] = None
+
+    @property
+    def op_class(self) -> str:
+        """Operator class for prediction: hyp_del_k collapses to hyp_del; the
+        proof-side operators (statement unchanged) collapse to proof_side."""
+        if self.operator.startswith("hyp_del"):
+            return "hyp_del"
+        if self.operator in ("sorry_inject", "axiom_inject"):
+            return "proof_side"
+        return self.operator
 
 
 class RunInputs(BaseModel):

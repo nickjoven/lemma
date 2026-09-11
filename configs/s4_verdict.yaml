@@ -1,0 +1,15 @@
+# S4 v1: mutant verdict predictor on Phase-3a labels (elaborates + operator).
+# Two classifier heads over the sealed S2 encoder; mutants inherit their
+# parent's module-level split; early stopping on val macro-F1(elaborates).
+# ood_operator: an operator class excluded from train/val and evaluated alone.
+s2_run: s2-mlm-20260909-141736
+tokenizer_path: runs/tokenizer/lean-unigram-32k.json
+mutant_corpus_cids: []   # filled from corpora/MANIFEST.yml when the mutant corpus lands
+max_seq: 256
+seed: 1337
+batch_size: 64
+steps: 3000
+val_every: 500
+lr_encoder: 3.0e-5
+lr_heads: 5.0e-4
+ood_operator: swap_lit_01

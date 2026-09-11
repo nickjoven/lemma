@@ -15,7 +15,7 @@ from typing import Iterator
 import blake3
 import yaml
 
-from ..schemas import DeclarationRow
+from ..schemas import DeclarationRow, MutantRow
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CORPORA = REPO_ROOT / "corpora"
@@ -42,6 +42,26 @@ def verify_shard(path: Path, cid: str) -> None:
     actual = blake3.blake3(path.read_bytes()).hexdigest()
     if actual != cid:
         raise CorpusError(f"{path.name}: content hash {actual} != manifest CID {cid}")
+
+
+def iter_mutants(corpus: str = "mutants", verify: bool = True) -> Iterator[MutantRow]:
+    """Phase-3 mutant records (quod mutant_extract.py output), verified per shard."""
+    man = load_manifest()
+    shards = man.get("corpora", {}).get(corpus)
+    if not shards:
+        raise CorpusError(f"manifest has no corpus named {corpus!r}")
+    for entry in shards:
+        path = CORPORA / entry["file"]
+        if verify:
+            verify_shard(path, entry["cid"])
+        with open(path) as f:
+            for line in f:
+                if line.strip():
+                    m = json.loads(line)
+                    yield MutantRow(parent_name=m["parent"], operator=m["operator"],
+                                    mutated_type=m["mutated_readable"], lock=m["lock"],
+                                    lock_changed=m["lock_changed"], elaborates=m["elaborates"],
+                                    gate_verdict=m["gate_verdict"], module=m.get("module"))
 
 
 def iter_rows(corpus: str = "declarations", verify: bool = True) -> Iterator[DeclarationRow]:

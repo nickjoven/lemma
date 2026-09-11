@@ -1,0 +1,16 @@
+# S5: equivalence discovery. One statement tower warm-started from the sealed
+# S2 run, symmetric InfoNCE over Iff sides + same-lock dedup pairs, module-
+# grouped hard negatives, early stopping on held-out known-Iff retrieval MRR.
+s2_run: s2-mlm-20260909-141736
+tokenizer_path: runs/tokenizer/lean-unigram-32k.json
+max_seq: 256
+proj_dim: 256
+seed: 1337
+batch_size: 128
+steps: 6000
+ckpt_every: 1000
+val_every: 1000
+val_pairs: 1500
+per_module: 4
+lr_encoder: 5.0e-5
+lr_heads: 5.0e-4
