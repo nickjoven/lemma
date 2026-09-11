@@ -15,7 +15,7 @@ from typing import Iterator
 import blake3
 import yaml
 
-from ..schemas import DeclarationRow, MutantRow
+from ..schemas import AttemptRow, DeclarationRow, MutantRow
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CORPORA = REPO_ROOT / "corpora"
@@ -62,6 +62,22 @@ def iter_mutants(corpus: str = "mutants", verify: bool = True) -> Iterator[Mutan
                                     mutated_type=m["mutated_readable"], lock=m["lock"],
                                     lock_changed=m["lock_changed"], elaborates=m["elaborates"],
                                     gate_verdict=m["gate_verdict"], module=m.get("module"))
+
+
+def iter_attempts(corpus: str = "attempts", verify: bool = True) -> Iterator[AttemptRow]:
+    """quod attempt records (scripts/attempt.py output), verified per shard."""
+    man = load_manifest()
+    shards = man.get("corpora", {}).get(corpus)
+    if not shards:
+        raise CorpusError(f"manifest has no corpus named {corpus!r}")
+    for entry in shards:
+        path = CORPORA / entry["file"]
+        if verify:
+            verify_shard(path, entry["cid"])
+        with open(path) as f:
+            for line in f:
+                if line.strip():
+                    yield AttemptRow.model_validate(json.loads(line))
 
 
 def iter_rows(corpus: str = "declarations", verify: bool = True) -> Iterator[DeclarationRow]:

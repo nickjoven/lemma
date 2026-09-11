@@ -57,6 +57,32 @@ class MutantRow(BaseModel):
         return self.operator
 
 
+class AttemptRow(BaseModel):
+    """One line of quod's attempts.jsonl (scripts/attempt.py). The outcome is
+    PROVER-RELATIVE: `no_proof_found` means the named prover, within its
+    recorded budget, found nothing — never `refuted`, never "unknown"."""
+
+    demonstrandum: str                       # theorem name (the parent, for mutant attempts)
+    prover: str
+    prover_config_cid: Optional[str] = None
+    outcome: str                             # accepted | no_proof_found | kernel_rejected
+    verdict: Optional[str] = None            # accepted | rejected: self-proof | rejected: extra axioms [...] | rejected: lean4checker | ...
+    tactic: Optional[str] = None
+    negated: bool = False
+    mutant_operator: Optional[str] = None    # set for mutant attempts (CORPUS_MUTATE)
+    mutant_lock: Optional[str] = None        # lock of the REBUILT mutant type; must equal the corpus mutant's lock
+    selfproof_ok: Optional[bool] = None
+
+    @property
+    def gate_verdict(self) -> str:
+        """Three-way label: proven | no_proof_found | rejected."""
+        if self.verdict == "accepted":
+            return "proven"
+        if self.verdict and self.verdict.startswith("rejected"):
+            return "rejected"
+        return "no_proof_found"
+
+
 class RunInputs(BaseModel):
     corpus_cids: list[str]
     split_manifest_cid: Optional[str] = None
