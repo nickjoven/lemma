@@ -69,6 +69,30 @@
     beyond binder names; then re-emit and submit. Gate submission itself needs
     a prover-in-the-loop (the gates verify a given proof; they do not find one)
     — a separate stage to design.
+- id: L-6
+  severity: medium
+  status: open
+  title: S4 v1 elaborates-predictor beats the bag-of-tokens baseline by only 6 pts and collapses on an unseen operator
+  detail: >
+    Run s4-verdict-20260911-152400 (sealed 40a2b7f7..., best val F1 0.936 @
+    1500), held-out eval 3690e8f2... (calibration_failed): elaborates macro-F1
+    0.941 (gate 0.80 PASS) but a bag-of-tokens logistic baseline reaches 0.880
+    (+6.1 pts, gate >= 10 FAIL), and on the held-out operator swap_lit_01 the
+    model scores 0.305 macro-F1 (near one-class). Operator identification 0.850.
+    Reading: the Phase-3a `elaborates` label is largely LEXICALLY predictable for
+    these operators (a `0` beside a `ℕ+`), so the task is too easy for a trivial
+    baseline and the model learns operator-specific surface patterns rather than
+    a general notion of well-typedness — exactly the distribution-shift failure
+    the plan's OOD control exists to expose. Test n is small (326 IID / 65 OOD;
+    5% module split of 8,187 statement mutants).
+  fix: >
+    (a) the substantive target is `gate_verdict` on statement mutants (does the
+    mutated claim still hold?), which needs Phase-3b proof attempts (L-2) — a
+    prover-in-the-loop stage; (b) a larger mutant sample (sample_mod 46 -> ~10)
+    for a usable test set; (c) operators that are not lexically trivial
+    (e.g. hypothesis WEAKENING/STRENGTHENING, quantifier swaps) so the baseline
+    cannot shortcut. Until then, cite S4 only as "operator-conditional elaborates
+    on this mutant distribution", never as a verdict predictor.
 - id: L-4
   severity: low
   status: open

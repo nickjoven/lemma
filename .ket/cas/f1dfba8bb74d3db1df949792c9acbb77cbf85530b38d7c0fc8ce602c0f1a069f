@@ -1,0 +1,29 @@
+{
+ "controls": [
+  {
+   "expect": ">=0.8",
+   "id": "elab-macro-f1",
+   "observed": 0.9411233519956654,
+   "ok": true
+  },
+  {
+   "expect": ">=0.1",
+   "id": "beats-bag-of-tokens",
+   "observed": 0.06141855494769488,
+   "ok": false
+  },
+  {
+   "expect": "<0.6",
+   "id": "permutation-sanity",
+   "observed": 0.5450440836028699,
+   "ok": true
+  },
+  {
+   "expect": "reported",
+   "id": "ood-operator",
+   "observed": 0.30506058446186746,
+   "ok": true
+  }
+ ],
+ "pass": false
+}

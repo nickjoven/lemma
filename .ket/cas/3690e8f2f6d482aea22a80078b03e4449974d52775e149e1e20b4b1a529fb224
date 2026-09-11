@@ -1,0 +1,19 @@
+{
+ "metrics": {
+  "elab_accuracy": 0.9663,
+  "elab_macro_f1": 0.9411,
+  "elab_macro_f1_bag_of_tokens": 0.8797,
+  "elab_macro_f1_ood": 0.3051,
+  "elab_margin_pts": 6.1,
+  "f1_gate": 0.8,
+  "label_scope": "Phase-3a: elaborates + operator; gate_verdict for statement mutants pending Phase-3b",
+  "ood_operator": "swap_lit_01",
+  "op_macro_f1": 0.8504,
+  "pass_f1": true,
+  "pass_margin": false,
+  "permutation_macro_f1": 0.545,
+  "test_mutants_iid": 326,
+  "test_mutants_ood": 65
+ },
+ "run_id": "s4-eval-s4-verdict-20260911-152400"
+}

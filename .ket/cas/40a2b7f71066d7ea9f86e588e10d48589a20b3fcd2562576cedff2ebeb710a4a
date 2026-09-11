@@ -1,0 +1,11 @@
+{
+ "metrics": {
+  "best_step": 1500,
+  "final_loss": 0.010153637480216275,
+  "ood_operator": "swap_lit_01",
+  "steps": 3000,
+  "train_mutants": 5552,
+  "val_macro_f1_elab_best": 0.9355
+ },
+ "run_id": "s4-verdict-20260911-152400"
+}
