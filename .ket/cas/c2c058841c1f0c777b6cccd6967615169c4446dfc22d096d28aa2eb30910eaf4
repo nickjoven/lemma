@@ -1,0 +1,13 @@
+{
+ "metrics": {
+  "best_step": 8000,
+  "final_loss": 0.25041611209511755,
+  "hard_negatives": "module-grouped batches, 4 per module",
+  "in_batch_acc": 0.8984375,
+  "logit_scale": 39.44715881347656,
+  "steps": 8000,
+  "train_pairs": 63812,
+  "val_hard_auc_best": 0.8405
+ },
+ "run_id": "s3-gloss-20260911-012141"
+}
