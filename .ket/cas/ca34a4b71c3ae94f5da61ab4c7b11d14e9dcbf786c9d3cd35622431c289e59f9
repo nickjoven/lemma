@@ -1,0 +1,17 @@
+{
+ "metrics": {
+  "deferred": "docstring x gate-verified mutant AUC (needs Phase-3 mutant corpus)",
+  "drift_auc_easy": 0.9814,
+  "drift_auc_hard_same_module": 0.767,
+  "hard_auc_gate": 0.9,
+  "hard_negatives": 3613,
+  "matched_top_decile": 0.1999,
+  "pass_hard_auc": false,
+  "permutation_auc": 0.5164,
+  "recall@1": 0.276,
+  "recall@10": 0.6477,
+  "retrieval_mrr": 0.3983,
+  "test_pairs": 3826
+ },
+ "run_id": "s3-eval-s3-gloss-20260910-174141"
+}

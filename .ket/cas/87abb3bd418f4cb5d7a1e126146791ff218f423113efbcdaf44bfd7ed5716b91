@@ -1,0 +1,23 @@
+{
+ "controls": [
+  {
+   "expect": "AUC>=0.9",
+   "id": "drift-hard-same-module",
+   "observed": 0.7670425683187745,
+   "ok": false
+  },
+  {
+   "expect": "0.45..0.55",
+   "id": "permutation-sanity",
+   "observed": 0.5163999162196422,
+   "ok": true
+  },
+  {
+   "expect": "reported",
+   "id": "matched-top-decile",
+   "observed": 0.19994772608468375,
+   "ok": true
+  }
+ ],
+ "pass": false
+}

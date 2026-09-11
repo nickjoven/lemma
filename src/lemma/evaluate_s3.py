@@ -106,9 +106,10 @@ def main() -> int:
                                                              if len(by_mod[mods[i]]) > 1]][:len(hard_neg)],
                                                   hard_neg])) if hard_neg else float("nan")
 
-    # top-decile: matched pairs among the top 10% of all (matched ∪ easy-neg) scores
-    allscores = np.r_[matched, easy_neg]
-    thresh = np.quantile(allscores, 0.90)
+    # matched pairs clearing a threshold that rejects 90% of random mismatches.
+    # (The earlier "top decile of ALL scores" definition capped at 20% by
+    # construction when matched and negative counts are equal — uninformative.)
+    thresh = np.quantile(np.asarray(easy_neg), 0.90)
     top_decile = float(np.mean(matched >= thresh))
 
     # permutation sanity: destroy labels -> AUC ~ 0.5

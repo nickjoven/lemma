@@ -1,0 +1,10 @@
+{
+ "metrics": {
+  "final_loss": 0.06258239247836173,
+  "in_batch_acc": 0.953125,
+  "logit_scale": 42.6964111328125,
+  "steps": 8000,
+  "train_pairs": 63812
+ },
+ "run_id": "s3-gloss-20260910-174141"
+}
