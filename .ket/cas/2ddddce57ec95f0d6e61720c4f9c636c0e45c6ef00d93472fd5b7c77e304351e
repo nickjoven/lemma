@@ -1,0 +1,13 @@
+{
+ "metrics": {
+  "best_step": 40,
+  "final_loss": 4.509135818481445,
+  "hard_negatives": "module-grouped batches, 4 per module",
+  "in_batch_acc": 0.0078125,
+  "logit_scale": 14.227916717529297,
+  "steps": 40,
+  "train_pairs": 63812,
+  "val_hard_auc_best": 0.5765
+ },
+ "run_id": "s3v2-smoke"
+}

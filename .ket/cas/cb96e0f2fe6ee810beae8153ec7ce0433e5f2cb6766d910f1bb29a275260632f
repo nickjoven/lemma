@@ -6,11 +6,11 @@ max_seq: 256
 proj_dim: 256
 seed: 1337
 batch_size: 128
-steps: 8000
-ckpt_every: 1000
+steps: 40
+ckpt_every: 20
 lr_encoder: 5.0e-5
 lr_heads: 5.0e-4
 # v2: hard-negative mining + early stopping (v1 hard-drift AUC 0.767 < 0.90)
 per_module: 4        # pairs per sampled module in a batch -> same-module hard negatives
-val_every: 1000      # probe val same-module hard-AUC; keep the best checkpoint
-val_pairs: 1500
+val_every: 20      # probe val same-module hard-AUC; keep the best checkpoint
+val_pairs: 300

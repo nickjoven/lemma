@@ -11,6 +11,7 @@ leakage-safe assignment, so eval glosses come from held-out modules.
 from __future__ import annotations
 
 import argparse
+import random
 import time
 from pathlib import Path
 
@@ -53,12 +54,71 @@ def load_s2_encoder(ckpt: Path, vocab_size: int, max_seq: int) -> Encoder:
     return enc
 
 
-def gloss_pairs(split: str) -> list[tuple[str, str, str]]:
-    """(docstring, statement, module) for declarations with a docstring in `split`."""
+def gloss_pairs_by_split() -> dict[str, list[tuple[str, str, str]]]:
+    """split -> [(docstring, statement, module)] for declarations with a docstring.
+    One corpus pass for all splits (the pass is the expensive part)."""
     rows = list(iter_rows("declarations", verify=False))
     assign = splits.assign(rows)
-    return [(r.docstring, encoder_text(r), r.module) for r in rows
-            if r.docstring and assign[r.name] == split]
+    out: dict[str, list] = {s: [] for s in splits.SPLITS}
+    for r in rows:
+        if r.docstring:
+            out[assign[r.name]].append((r.docstring, encoder_text(r), r.module))
+    return out
+
+
+def gloss_pairs(split: str) -> list[tuple[str, str, str]]:
+    return gloss_pairs_by_split()[split]
+
+
+def module_index(pairs: list[tuple[str, str, str]]) -> dict[str, list[int]]:
+    by_mod: dict[str, list[int]] = {}
+    for i, (_, _, m) in enumerate(pairs):
+        by_mod.setdefault(m, []).append(i)
+    return by_mod
+
+
+def sample_hard_batch(rng: np.random.Generator, by_mod: dict[str, list[int]], mods: list[str],
+                      bs: int, per_module: int) -> list[int]:
+    """Module-grouped batch: several pairs from each sampled module, so
+    same-module statements are in-batch HARD negatives for each other. v1
+    used uniform random pairs and never exercised the same-module case — the
+    exact case its hard-drift AUC (0.767) failed on."""
+    idx: list[int] = []
+    while len(idx) < bs:
+        m = mods[rng.integers(0, len(mods))]
+        members = by_mod[m]
+        take = min(per_module, len(members), bs - len(idx))
+        idx.extend(rng.choice(members, size=take, replace=False).tolist())
+    return idx
+
+
+@torch.no_grad()
+def val_hard_auc(model: "GlossModel", tok: Tokenizer, val: list[tuple[str, str, str]],
+                 max_seq: int, device: str, rng: random.Random) -> float:
+    """Same-module hard-negative drift AUC on a fixed val subset — the S3 gate
+    metric, probed during training for early stopping."""
+    from sklearn.metrics import roc_auc_score
+    model.eval()
+    pad = model.enc.cfg.pad_id
+    G, S = [], []
+    for i in range(0, len(val), 256):
+        chunk = val[i:i + 256]
+        with torch.autocast(device, dtype=torch.bfloat16, enabled=device == "cuda"):
+            G.append(model.encode(tokenize(tok, [c[0] for c in chunk], max_seq, pad).to(device), "g").float().cpu())
+            S.append(model.encode(tokenize(tok, [c[1] for c in chunk], max_seq, pad).to(device), "s").float().cpu())
+    G, S = torch.cat(G), torch.cat(S)
+    sims = G @ S.T
+    by_mod = module_index(val)
+    pos, neg = [], []
+    for i, (_, _, m) in enumerate(val):
+        others = [k for k in by_mod[m] if k != i]
+        if others:
+            pos.append(sims[i, i].item())
+            neg.append(sims[i, rng.choice(others)].item())
+    model.train()
+    if len(pos) < 20:
+        return float("nan")
+    return float(roc_auc_score([1] * len(pos) + [0] * len(neg), pos + neg))
 
 
 def tokenize(tok: Tokenizer, texts: list[str], max_seq: int, pad_id: int) -> torch.Tensor:
@@ -93,8 +153,13 @@ def main() -> int:
     model = GlossModel(enc, cfg.get("proj_dim", 256)).to(device)
     pad = enc.cfg.pad_id
 
-    train = gloss_pairs("train")
-    print(f"train gloss pairs: {len(train)}", flush=True)
+    by_split = gloss_pairs_by_split()
+    train = by_split["train"]
+    prng = random.Random(cfg.get("seed", 1337))
+    val = prng.sample(by_split["val"], min(cfg.get("val_pairs", 1500), len(by_split["val"])))
+    by_mod = module_index(train)
+    mods = list(by_mod)
+    print(f"train gloss pairs: {len(train)} over {len(mods)} modules; val probe: {len(val)}", flush=True)
     opt = torch.optim.AdamW([
         {"params": model.enc.parameters(), "lr": float(cfg.get("lr_encoder", 5e-5))},
         {"params": [*model.proj_g.parameters(), *model.proj_s.parameters(), model.logit_scale],
@@ -118,13 +183,23 @@ def main() -> int:
     ckpt_dir = REPO_ROOT / "runs" / "ckpts"
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     rolling = ckpt_dir / f"{run_id}-latest.safetensors"
+    best_path = ckpt_dir / f"{run_id}-best.safetensors"
+    val_every, per_module = cfg.get("val_every", 1000), cfg.get("per_module", 4)
+    best_auc, best_step = -1.0, -1
     losses, accs = [], []
     model.train()
     for step in range(steps):
         if step > 0 and step % ckpt_every == 0:
             save_ckpt(model, rolling)
             print(f"step {step}: rolling checkpoint", flush=True)
-        idx = rng.integers(0, len(train), size=bs)
+        if step > 0 and step % val_every == 0:
+            auc = val_hard_auc(model, tok, val, cfg["max_seq"], device, prng)
+            improved = auc > best_auc
+            if improved:
+                best_auc, best_step = auc, step
+                save_ckpt(model, best_path)
+            print(f"step {step}: val hard-AUC {auc:.4f}{' (best, saved)' if improved else ''}", flush=True)
+        idx = sample_hard_batch(rng, by_mod, mods, bs, per_module)
         g_ids = tokenize(tok, [train[i][0] for i in idx], cfg["max_seq"], pad).to(device)
         s_ids = tokenize(tok, [train[i][1] for i in idx], cfg["max_seq"], pad).to(device)
         with torch.autocast(device, dtype=torch.bfloat16, enabled=device == "cuda"):
@@ -143,8 +218,14 @@ def main() -> int:
             print(f"step {step}: loss {np.mean(losses[-100:]):.4f} in-batch@1 {accs[-1]:.4f} "
                   f"scale {model.logit_scale.exp().item():.1f}", flush=True)
 
+    # Early stopping: the sealed checkpoint is the one with the best val
+    # hard-AUC, not the last step (v1 overfit: train loss 0.063, held-out R@1 28%).
+    auc = val_hard_auc(model, tok, val, cfg["max_seq"], device, prng)
+    if auc > best_auc:
+        best_auc, best_step = auc, steps
+        save_ckpt(model, best_path)
     ckpt = ckpt_dir / f"{run_id}.safetensors"
-    save_ckpt(model, ckpt)
+    best_path.replace(ckpt)
     cid = ledger.ket_put(ckpt.read_bytes())
     rec.checkpoint_cids.append(cid)
     rolling.unlink(missing_ok=True)
@@ -159,6 +240,8 @@ def main() -> int:
         "in_batch_acc": float(accs[-1]) if accs else 0.0,
         "steps": steps, "train_pairs": len(train),
         "logit_scale": model.logit_scale.exp().item(),
+        "val_hard_auc_best": round(best_auc, 4), "best_step": best_step,
+        "hard_negatives": f"module-grouped batches, {per_module} per module",
     }, started_monotonic=t0)
     print(f"run {run_id} sealed; metrics_cid {rec.metrics_cid}", flush=True)
     return 0
