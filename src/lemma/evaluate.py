@@ -6,9 +6,12 @@ Usage pattern (every stage):
     metrics = compute(...)                    # the actual eval
     finish_run(rec, metrics, status="completed" if ok else "calibration_failed")
 
-Calibration controls are small known-answer cases (calibration/*.yml); a
-failing control makes the run's training metrics uncitable, mirroring quod's
-rule that a failing positive control means the gates are wrong.
+Calibration controls are small known-answer cases; each stage's evaluator
+(evaluate_s2.py .. evaluate_s5.py) embeds its own and seals the results with
+the run. A failing control makes the run's training metrics uncitable,
+mirroring quod's rule that a failing positive control means the gates are
+wrong. `load_controls` also accepts YAML control files under calibration/;
+none are checked in.
 """
 
 from __future__ import annotations
