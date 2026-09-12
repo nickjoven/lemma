@@ -114,6 +114,20 @@ corpora:
   - file: dag/dag_depth-full-20260908b.jsonl
     cid: 7db2cf06a526c88f64c11518e89272225fe08564a2c57a706c723bc84693f38f
     records: 296187
+  goals:
+  - file: goals/theorems-A-t1-goals-0000.jsonl
+    cid: d51afba55eb8538f8ae6db73f2e713f4ca821e0a518780ed7ed60299ecf0643e
+    records: 5923
+  transitions:
+  - file: transitions/theorems-A-t1-transitions-0000.jsonl
+    cid: 5ecb295db054c4bac537c7cb84387b913cdc7947e057389481d609c94b8fa087
+    records: 10000
+  - file: transitions/theorems-A-t1-transitions-0001.jsonl
+    cid: b379dcb8d72d657915d0fff1cdfd2fda42e60df41743538581d64f4d15567f1b
+    records: 10000
+  - file: transitions/theorems-A-t1-transitions-0002.jsonl
+    cid: 3796eb65d35451ef9757e9cdeb64ea3159ac04308fcd8bdac7e42859412d9ccd
+    records: 6130
 sources:
   mutants:
     run_id: mutants-20260911
@@ -129,3 +143,18 @@ sources:
   dag_depth:
     corpus: full-20260908b
     manifest_cid: cbd1c771126ead8c55d6f236ce662dda454cf0d5510f42e4986cc5bc6905a827
+  transitions:
+    run_id: theorems-A-t1
+    prover: ladder-A
+    manifest_cid: 6fe9d0678ff951f24522c9bbc0c4cc6e1703a8671411a9506c621e4f80b9b260
+    prover_config_cid: 7a37076c095993005c8dd924a9f88e58528dfffbff968bc9f26f9fa19056ae28
+    pins:
+      lean: v4.28.0
+      mathlib: 8f9d9cff6bd728b17a24e163c9402775d9e6a365
+      jin: f9d5c8d39bece41ceedf6346ef50ad1fb393260e
+      lean4checker: 66e11cea12f5ba215d76b15b7f8495141bf52c6c
+    regate_of: null
+    n_transitions: 26130
+    n_goals: 5923
+    censored: 94
+    accepted_path_fraction: 0.4025
