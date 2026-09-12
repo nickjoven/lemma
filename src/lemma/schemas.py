@@ -7,7 +7,7 @@ exist exactly insofar as `metrics_cid` resolves in the project's ket store.
 
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Union, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -72,6 +72,10 @@ class AttemptRow(BaseModel):
     mutant_operator: Optional[str] = None    # set for mutant attempts (CORPUS_MUTATE)
     mutant_lock: Optional[str] = None        # lock of the REBUILT mutant type; must equal the corpus mutant's lock
     selfproof_ok: Optional[bool] = None
+    dedup: bool = False                      # the mutant coincides with an existing theorem (same lock); a legitimate proof
+    dedup_of: Optional[list[str]] = None
+    source: str = "ladder"                   # ladder | search | adversarial
+    predictor_cid: Optional[str] = None      # set when a learned predictor proposed the attempt
 
     @property
     def gate_verdict(self) -> str:
@@ -81,6 +85,53 @@ class AttemptRow(BaseModel):
         if self.verdict and self.verdict.startswith("rejected"):
             return "rejected"
         return "no_proof_found"
+
+
+class TransitionRow(BaseModel):
+    """One tactic step of one quod attempt (attempts/<run>/transitions/). Goals
+    are identified by LOCK (the goal closed over its hypotheses, canonicalised
+    like a statement); their text lives in the goals shards. `outcome` is
+    closed | open | error | budget; a `budget` row is CENSORED (the heartbeat
+    cap was hit), never a cost observation. `source` tells who produced the
+    step (ladder | search | adversarial) and `predictor_cid` which model."""
+
+    attempt_id: str
+    demonstrandum: str
+    demonstrandum_lock: Optional[str] = None
+    mutant_operator: Optional[str] = None
+    negated: bool = False
+    prover: str
+    prover_config_cid: Optional[str] = None
+    source: str = "ladder"
+    predictor_cid: Optional[str] = None
+    pos: int
+    kind: str                                # intros | rung
+    tactic: str
+    goal_before: str
+    goal_after: Union[str, list[str]]        # "closed" | "error" | [locks]
+    outcome: str
+    err_class: str = ""
+    err: str = ""
+    heartbeats: int
+    heartbeat_cap: int
+    censored: bool = False
+    wall_ms: int = 0
+    on_accepted_path: bool = False
+    attempt_outcome: str
+    attempt_verdict: Optional[str] = None
+
+    @property
+    def progressed(self) -> bool:
+        """The step changed the goal state without error (closed, or open goals
+        differing from the input) — the rows the translation test uses."""
+        return self.outcome == "closed" or (self.outcome == "open" and self.goal_after != [self.goal_before])
+
+
+class GoalRow(BaseModel):
+    lock: str
+    readable: str
+    readable_truncated: bool = False
+    canonical: Optional[str] = None
 
 
 class RunInputs(BaseModel):

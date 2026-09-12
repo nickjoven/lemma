@@ -89,3 +89,14 @@ def manifest(rows: list[DeclarationRow]) -> dict:
         "train_test_dep_jaccard": round(inter / union, 4),
         "assignment": splits,
     }
+
+
+def assign_transitions(rows, decl_splits: dict[str, str]) -> dict[int, str]:
+    """index -> split; a transition inherits its DEMONSTRANDUM's split (for a
+    mutant attempt, the parent theorem's), so no goal of a held-out theorem's
+    proof search is seen in training. Unknown demonstranda are excluded."""
+    out: dict[int, str] = {}
+    for i, t in enumerate(rows):
+        if t.demonstrandum in decl_splits:
+            out[i] = decl_splits[t.demonstrandum]
+    return out

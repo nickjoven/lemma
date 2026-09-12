@@ -8,7 +8,7 @@ s2_run: s2-mlm-20260909-141736
 tokenizer_path: runs/tokenizer/lean-unigram-32k.json
 mutant_corpus_cids: ["06622cffb6eb737eb84d9b71d450678916fff818699b767ad7adedc9b3dd7f57"]
 attempts_corpus: attempts
-attempts_corpus_cids: []        # filled when the attempts corpus is wired into corpora/MANIFEST.yml
+attempts_corpus_cids: ["6f94741297b56ff12cecaadb24a3ab5bbdb8bcdbb9f2322332ee62d414b96eb8"]   # quod run mutants-A-r1 manifest
 prover: ladder-A
 min_support: 30
 max_seq: 256

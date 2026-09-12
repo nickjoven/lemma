@@ -106,8 +106,26 @@ corpora:
   - file: mutants/mutants-0001.jsonl
     cid: 6e79a2b83a189174577fd96df04cb0660eea1dd82ee36708320da014dfd8fc0f
     records: 9007
+  attempts:
+  - file: attempts/attempts-mutants-A-r1.jsonl
+    cid: 7105030bae3c4e713919828b40b3b5155c7a7aa8f1909f7ecb45fe44baf3c11e
+    records: 6152
+  dag_depth:
+  - file: dag/dag_depth-full-20260908b.jsonl
+    cid: 7db2cf06a526c88f64c11518e89272225fe08564a2c57a706c723bc84693f38f
+    records: 296187
 sources:
   mutants:
     run_id: mutants-20260911
     manifest_cid: 06622cffb6eb737eb84d9b71d450678916fff818699b767ad7adedc9b3dd7f57
     sample_mod: 46
+  attempts:
+    run_id: mutants-A-r1
+    regate_of: mutants-A
+    prover: ladder-A
+    manifest_cid: 6f94741297b56ff12cecaadb24a3ab5bbdb8bcdbb9f2322332ee62d414b96eb8
+    prover_config_cid: 6ca1753b64aff00aa4fd859433d3209008650a8e68cb791cbec032cbc8bebc55
+    mutant_corpus_manifest_cid: 06622cffb6eb737eb84d9b71d450678916fff818699b767ad7adedc9b3dd7f57
+  dag_depth:
+    corpus: full-20260908b
+    manifest_cid: cbd1c771126ead8c55d6f236ce662dda454cf0d5510f42e4986cc5bc6905a827

@@ -15,7 +15,7 @@ from typing import Iterator
 import blake3
 import yaml
 
-from ..schemas import AttemptRow, DeclarationRow, MutantRow
+from ..schemas import AttemptRow, DeclarationRow, GoalRow, MutantRow, TransitionRow
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CORPORA = REPO_ROOT / "corpora"
@@ -93,3 +93,30 @@ def iter_rows(corpus: str = "declarations", verify: bool = True) -> Iterator[Dec
             for line in f:
                 if line.strip():
                     yield DeclarationRow.model_validate_json(line)
+
+
+def _iter_shards(corpus: str, verify: bool):
+    man = load_manifest()
+    shards = man.get("corpora", {}).get(corpus)
+    if not shards:
+        raise CorpusError(f"manifest has no corpus named {corpus!r}")
+    for entry in shards:
+        path = CORPORA / entry["file"]
+        if verify:
+            verify_shard(path, entry["cid"])
+        with open(path) as f:
+            for line in f:
+                if line.strip():
+                    yield line
+
+
+def iter_transitions(corpus: str = "transitions", verify: bool = True) -> Iterator[TransitionRow]:
+    """quod transition records (attempts/<run>/transitions/transitions-*.jsonl), verified per shard."""
+    for line in _iter_shards(corpus, verify):
+        yield TransitionRow.model_validate_json(line)
+
+
+def iter_goals(corpus: str = "goals", verify: bool = True) -> Iterator[GoalRow]:
+    """The goal table the transitions reference by lock, verified per shard."""
+    for line in _iter_shards(corpus, verify):
+        yield GoalRow.model_validate_json(line)
