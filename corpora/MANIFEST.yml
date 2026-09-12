@@ -118,6 +118,12 @@ corpora:
   - file: goals/theorems-A-t1-goals-0000.jsonl
     cid: d51afba55eb8538f8ae6db73f2e713f4ca821e0a518780ed7ed60299ecf0643e
     records: 5923
+  - file: goals/mutants-A-t1-goals-0000.jsonl
+    cid: 59925cd740937bcace2821d6c75f4a1fcc4785e854712d9b4fb14621c2113806
+    records: 10000
+  - file: goals/mutants-A-t1-goals-0001.jsonl
+    cid: 11ba396bbc049ea5bb1fc07687218ea33866bf56b2471ee4d2726dc16f29895d
+    records: 2529
   transitions:
   - file: transitions/theorems-A-t1-transitions-0000.jsonl
     cid: 5ecb295db054c4bac537c7cb84387b913cdc7947e057389481d609c94b8fa087
@@ -128,6 +134,21 @@ corpora:
   - file: transitions/theorems-A-t1-transitions-0002.jsonl
     cid: 3796eb65d35451ef9757e9cdeb64ea3159ac04308fcd8bdac7e42859412d9ccd
     records: 6130
+  - file: transitions/mutants-A-t1-transitions-0000.jsonl
+    cid: 01e22ee4e63c2c2d6b294ed5df26fedac19f33b36ccb32f179d5c79f4695d146
+    records: 10000
+  - file: transitions/mutants-A-t1-transitions-0001.jsonl
+    cid: ac12f8bc326264d1fac6db0be2973d66eddeba7b9587166e34b0264e37375ba3
+    records: 10000
+  - file: transitions/mutants-A-t1-transitions-0002.jsonl
+    cid: 152e20e7ba4c0a0199f820807b8c371cc6172dc57c3ba3b815b285ee71cdc053
+    records: 10000
+  - file: transitions/mutants-A-t1-transitions-0003.jsonl
+    cid: c91e901cc87d5777aa74feb86c267b41dbf2209a486be52a7da0f0bd62d71d85
+    records: 10000
+  - file: transitions/mutants-A-t1-transitions-0004.jsonl
+    cid: 92593627d6b14f60dcd1bc26337f6de289236c8a517407154cab367564cb5009
+    records: 2910
 sources:
   mutants:
     run_id: mutants-20260911
@@ -144,9 +165,9 @@ sources:
     corpus: full-20260908b
     manifest_cid: cbd1c771126ead8c55d6f236ce662dda454cf0d5510f42e4986cc5bc6905a827
   transitions:
-    run_id: theorems-A-t1
+    run_id: mutants-A-t1
     prover: ladder-A
-    manifest_cid: 6fe9d0678ff951f24522c9bbc0c4cc6e1703a8671411a9506c621e4f80b9b260
+    manifest_cid: 847bcbcedc919c4c049ba662f0644640ba1625eb62f2619d52628f9e820159e2
     prover_config_cid: 7a37076c095993005c8dd924a9f88e58528dfffbff968bc9f26f9fa19056ae28
     pins:
       lean: v4.28.0
@@ -154,7 +175,7 @@ sources:
       jin: f9d5c8d39bece41ceedf6346ef50ad1fb393260e
       lean4checker: 66e11cea12f5ba215d76b15b7f8495141bf52c6c
     regate_of: null
-    n_transitions: 26130
-    n_goals: 5923
-    censored: 94
-    accepted_path_fraction: 0.4025
+    n_transitions: 42910
+    n_goals: 12529
+    censored: 786
+    accepted_path_fraction: 0.0066
