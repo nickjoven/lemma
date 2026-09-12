@@ -7,7 +7,7 @@ s2_run: s2-mlm-20260909-141736
 tokenizer_path: runs/tokenizer/lean-unigram-32k.json
 transitions_corpus: transitions
 goals_corpus: goals
-transitions_corpus_cids: ["6fe9d0678ff951f24522c9bbc0c4cc6e1703a8671411a9506c621e4f80b9b260", "847bcbcedc919c4c049ba662f0644640ba1625eb62f2619d52628f9e820159e2", "285ea472037a", "501ae3fe580f", "91c9461231c8"]   # quod theorems-A-t1, mutants-A-t1, pilot-S, pilot-S-neg, test200-S (full CIDs in corpora/MANIFEST.yml sources)
+transitions_corpus_cids: ["6fe9d0678ff951f24522c9bbc0c4cc6e1703a8671411a9506c621e4f80b9b260", "847bcbcedc919c4c049ba662f0644640ba1625eb62f2619d52628f9e820159e2", "285ea472037a1e606eda7321aa25459f0571a5c0931ec29235c30a8a41c1622b", "501ae3fe580ff9259f467cebbc3aede07a0bf9fbdc9c73d5ab49c3c3598bc23b", "91c9461231c87ec3ba95eb01e51997459625f5bfd0234171d5a8985a26a0269f"]   # quod theorems-A-t1, mutants-A-t1, pilot-S, pilot-S-neg, test200-S
 max_seq: 256
 seed: 1337
 batch_size: 64
