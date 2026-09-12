@@ -1,0 +1,21 @@
+# S4 v2: mutant verdict predictor on Phase-3b PROVER-RELATIVE labels
+# (quod attempts.jsonl joined to the mutant corpus by lock equality).
+# One classifier head over the sealed S2 encoder; classes decided by support
+# (labels.collapse_rule); mutants inherit their parent's module-level split;
+# early stopping on val macro-F1. `prover` restricts attempts to one prover so
+# the label has a single meaning; ood_operator is held out of train/val.
+s2_run: s2-mlm-20260909-141736
+tokenizer_path: runs/tokenizer/lean-unigram-32k.json
+mutant_corpus_cids: ["06622cffb6eb737eb84d9b71d450678916fff818699b767ad7adedc9b3dd7f57"]
+attempts_corpus: attempts
+attempts_corpus_cids: []        # filled when the attempts corpus is wired into corpora/MANIFEST.yml
+prover: ladder-A
+min_support: 30
+max_seq: 256
+seed: 1337
+batch_size: 64
+steps: 3000
+val_every: 250
+lr_encoder: 3.0e-5
+lr_heads: 5.0e-4
+ood_operator: swap_lit_01
