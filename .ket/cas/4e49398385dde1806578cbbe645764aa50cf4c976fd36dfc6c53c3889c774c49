@@ -1,0 +1,39 @@
+{
+ "metrics": {
+  "cost_censored_pred_ge_cap_frac": 0.1111,
+  "cost_censored_rows": 36,
+  "cost_mae_log_uncensored": 0.757,
+  "gate_bar": 0.8954,
+  "mrr_identity": 0.3211,
+  "mrr_lexical": 0.5792,
+  "mrr_offset": 0.7954,
+  "mrr_w0": 0.883,
+  "mrr_w0_permuted": 0.0252,
+  "outcome_macro_f1": 0.596,
+  "outcome_support": {
+   "budget": 36,
+   "closed": 245,
+   "error": 2047,
+   "open": 311
+  },
+  "pass_retrieval": false,
+  "per_tactic": {
+   "aesop": {
+    "mrr_offset": 0.717,
+    "mrr_w0": 0.8462,
+    "n": 139,
+    "translation": false
+   },
+   "simp": {
+    "mrr_offset": 0.8705,
+    "mrr_w0": 0.9252,
+    "n": 145,
+    "translation": false
+   }
+  },
+  "test_rows": 2639,
+  "test_single_step": 284,
+  "translation_tactics": []
+ },
+ "run_id": "w0-eval-w0-world-20260912-012400"
+}

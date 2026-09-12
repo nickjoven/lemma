@@ -1,0 +1,19 @@
+# W0 world model: f(embed(goal_before), tactic) -> embed(goal_after), EMA
+# target encoder, in-batch InfoNCE (the gate objective), outcome head, and a
+# censored (Tobit) cost head. Warm-started from the sealed S2 encoder.
+# Gate (evaluate): next-state MRR on module-held-out single-step transitions
+# >= max(offset baseline, lexical baseline) + 0.10; permutation control.
+s2_run: s2-mlm-20260909-141736
+tokenizer_path: runs/tokenizer/lean-unigram-32k.json
+transitions_corpus: transitions
+goals_corpus: goals
+transitions_corpus_cids: ["6fe9d0678ff951f24522c9bbc0c4cc6e1703a8671411a9506c621e4f80b9b260", "847bcbcedc919c4c049ba662f0644640ba1625eb62f2619d52628f9e820159e2"]   # quod theorems-A-t1, mutants-A-t1
+max_seq: 256
+seed: 1337
+batch_size: 64
+steps: 4000
+val_every: 250
+lr_encoder: 3.0e-5
+lr_heads: 5.0e-4
+ema: 0.99
+temperature: 0.07

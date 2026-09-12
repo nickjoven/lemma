@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "title": "attempts harness built; exit 5 sealed; transitions + W0 v1 sealed",
+  "summary": "2026-09-12: quod attempts harness complete (mutants-A-r1 exit-5 sealed 6f947412; transitions runs theorems-A-t1 6fe9d067 / mutants-A-t1 847bcbce; dag_depth cbd1c771; verified full-SHA pins). lemma: S4 v2 margin +18.1 PASS / F1 0.707 FAIL (L-6); W0 v1 MRR 0.883 vs bar 0.895 FAIL by 1.2 (L-7, eval 4e493983). Open for Nick: Q-25 (exit 6 vacuous), L-7 stepping prover / tier B, tier B API budget.",
+  "artifacts": [
+    {
+      "name": "OPEN.yml",
+      "cid": "0d0c12d772b2d48b99cffdb6a18fa05b701789bb49fa463be4b78c484245522c"
+    },
+    {
+      "name": "ledger.jsonl",
+      "cid": "8fc2d25df9d8cbba1d5451efe1e37f497699f993811b3552c31d88e241ae80cf"
+    },
+    {
+      "name": "MANIFEST.yml",
+      "cid": "33f9771799cb0fd3ffb30042effe47f350ca568eb076aa5ecb8ee791b87315d3"
+    },
+    {
+      "name": "w0_world.yaml",
+      "cid": "e9895d531a43c4ffbeadd6d25ea14c4f4bc686224e7ece6f5ca2dd87d6dac868"
+    },
+    {
+      "name": "s4v2_verdict.yaml",
+      "cid": "886ca076f11c31ad68d6ffde5db461d4bf6ba67310d5cc2b7aa74394649c3be2"
+    },
+    {
+      "name": "OPEN.yml",
+      "cid": "063633aee6b4806b27c425ec351ab26f84472a67e01ee6e848e99faa4cd4d6b8"
+    },
+    {
+      "name": "exit5-tierA.json",
+      "cid": "3dc28a9a38fe30d0f86dc193fcb39fa01c581d921411a878fc0275eb9ab1a9d5"
+    }
+  ],
+  "meta": {
+    "catbus_packet": "true",
+    "lemma_head": "9d5701d",
+    "quod_branch": "attempts-impl",
+    "quod_pr": "3"
+  },
+  "cdom": null
+}

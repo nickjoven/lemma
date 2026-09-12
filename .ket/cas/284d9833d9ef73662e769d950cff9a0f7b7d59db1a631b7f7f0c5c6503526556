@@ -1,0 +1,6 @@
+{
+ "max_candidates": 2000,
+ "max_seq": 256,
+ "s2_run": "s2-mlm-20260909-141736",
+ "seed": 1337
+}

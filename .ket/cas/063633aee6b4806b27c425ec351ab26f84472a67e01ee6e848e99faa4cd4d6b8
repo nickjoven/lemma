@@ -1,0 +1,259 @@
+# Every known problem with the ledger, in view. Rule (2026-09-06): a gap
+# that is known and unlisted is a defect of the ledger, not of the gap.
+# status: open | fix-pending (code written, run not yet recorded) | closed <date> <how>
+# severity: high = a status can be wrong or forged; medium = coverage gap;
+#           low = cost, ergonomics, or by-design limit worth stating.
+- id: Q-1
+  severity: high
+  status: closed 2026-09-06 by SEMANTICS.md: hypotheses are part of the lock and are listed as a descriptor; `conditional` removed from the lattice; a D with hypotheses is proven as the implication it is
+  title: hypotheses are not machine-extracted; `conditional` is never computed
+  detail: >
+    The status table promises `conditional` for sorry-free proofs whose
+    premises are named claims or undischarged hypotheses, and the claim
+    schema has a `hypotheses:` field. Neither is implemented. The
+    hypothesis-deletion mutant list is hand-typed per control (P1 only).
+    A theorem `(step : ...) : ...` over Mathlib-only constants computes
+    `proven` with the premise silently inside the lock (the lock is honest;
+    the label is not, see Q-5).
+  fix: extract binders from the elaborated type; generate one deletion mutant
+    per explicit hypothesis; list premises in the claim; `conditional` when any
+    premise names a claim id or is not an instance/typeclass binder.
+- id: Q-2
+  severity: medium
+  status: open
+  title: satisfiability witness is not run per claim
+  detail: P1Anchors.lean carries one `example` at n := Fin 1 compiled with the
+    module; the runner does not check a witness for any claim.
+- id: Q-3
+  severity: medium
+  status: open
+  title: source scan over the transitive module closure is not implemented
+  detail: L0 describes a scan for sorry, axiom, native_decide, implemented_by,
+    extern, unsafe, set_option outside Mathlib. The axiom gate catches the
+    kernel-visible cases (sorryAx, ofReduceBool, user axioms); the scan is
+    defense in depth and does not exist yet.
+- id: Q-4
+  severity: low
+  status: open (reduces_to_True is now a recorded descriptor and N2 requires it; general triviality still undetected)
+  title: triviality detection covers only a head that unfolds to `True`
+  detail: `1 = 1` or `True ∧ True` behind a grand name computes `proven`.
+    The lock is honest; the exposure is the label (Q-5). Also, an anchor
+    `c ↔ True` is admissible and would launder a private predicate into a
+    trivial but `proven` claim; anchor_check should whnf the rhs too.
+- id: Q-5
+  severity: high
+  status: open
+  title: prose-versus-lock drift is unchecked
+  detail: >
+    `statement:` is free text written by the prover. This is exactly how
+    "P vs NP" got attached to `True`. No sieve dimension reads the
+    pretty-printed lock against the prose, and no second prover has
+    reviewed any control's statement (decision 4 not yet wired).
+  fix: generate `statement:` from the lock (pp type) and keep the human
+    gloss in a separately labelled field; sieve dim "statement fidelity".
+- id: Q-6
+  severity: medium
+  status: open
+  title: hyp_mutant counts any compile failure as a kill
+  detail: A deletion that breaks syntax elsewhere counts as killed. The
+    textual `--delete` cannot reach binders introduced by `variable`.
+- id: Q-7
+  severity: low
+  status: open
+  title: lean4checker is run on the declaring module, not `--fresh` over the closure
+  detail: Decision 2 makes it required for `proven`; the invocation should
+    replay the whole environment of the pin once per landing.
+- id: Q-8
+  severity: high
+  status: closed 2026-09-06 refute_check.py + control N8; calibration PASS 11/11 (recheck11.log)
+  title: refuted_by was a nomination nothing verified
+  detail: Any axiom-clean theorem under any name could mark any claim
+    `refuted`. Same class as the anchor hole found this morning.
+  fix: scripts/refute_check.py requires the nominated type to be ¬T with T's
+    canonical form equal to the claim's; control N8 (forged refutation).
+- id: Q-9
+  severity: low
+  status: open
+  title: universe-polymorphic claims can only be refuted at the same universe binding
+  detail: The refutation gate demands lock equality, so N4 had to be restated
+    over `Type` for P2's `Fin 2` counterexample to count. A checked
+    instantiation edge (`Type u` ↦ `Type`) would lift this.
+- id: Q-10
+  severity: high
+  status: open
+  title: claim files and RESULTS.json are unguarded plain files
+  detail: A status can be typed by hand and nothing notices until a rerun.
+    No LAW pin of the runner scripts, no append-only gate, no message gate.
+  fix: port the proslambenomenos gates; `calibrate.py --check` recomputes
+    and diffs against the recorded files; LAW pins scripts/*.py.
+- id: Q-11
+  severity: medium
+  status: open
+  title: nominations live in calibrate.py source, not in claim files
+  detail: ANCHORS, refuted_by, dedup_with, mutants are Python literals. They
+    belong in the claim file as nominations the runner verifies.
+- id: Q-12
+  severity: medium
+  status: open
+  title: the corpus is blobs, not a graph
+  detail: Only `ket put` is used. No statement/proof/verification nodes, no
+    proves/anchors/refutes edges; the "corpus" is CIDs referenced from yml.
+- id: Q-13
+  severity: medium
+  status: open
+  title: runtime scales per check, not per module
+  detail: 10 controls take 9m36s because every gate spawns a Lean process
+    that imports Mathlib. Hundreds of claims need one Lean process per
+    module running all checks.
+- id: Q-14
+  severity: low
+  status: open
+  title: second 7 GB Mathlib clone under calib/.lake
+  detail: Lake path dependency resolution re-cloned Jin's Mathlib. Could be a
+    symlink.
+- id: Q-15
+  severity: low
+  status: open
+  title: locks are pin-relative by construction
+  detail: The canonical form is a pretty-printer string at one Lean/Mathlib
+    version. Dedup across pins is impossible; decision 3 forbids cross-pin
+    claims, so this is by design, but it must be said.
+- id: Q-16
+  severity: medium
+  status: open (proof-to-demonstrandum pairing now verified by lock equality, N9)
+  title: every table the runner consults is a nomination
+  detail: Anchors (fixed, N6/N7), refutations (fixed, N8), dedup targets (verified
+    by lock equality), mutants (Q-1), checker module names (unverified: a
+    wrong module name checks the wrong module).
+- id: Q-17
+  severity: low
+  status: open
+  title: no automated gate-off self-test
+  detail: "Positive control fails when gate X is disabled" was done by hand
+    once (anchors emptied). Should be a runner mode.
+- id: Q-18
+  severity: low
+  status: closed 2026-09-06 verified against millennium/registry/lake-manifest.json (mathlib fabf563a7c, physlib 3dddd61e23, recorded in millennium/PIN.yml)
+  title: the Millennium registry pin in ARCHITECTURE.md was written from memory
+  detail: It said mathlib fabf563a. The registry clone at fd52071 must be
+    read for its actual manifest revision before any lock is recorded.
+- id: Q-19
+  severity: medium
+  status: open
+  title: Millennium registry not yet imported
+  detail: Clone at millennium/registry (fd52071, Lean v4.31.0). Needs cache,
+    build at its own pin, seven clay_prize_* locks, claim files, and the
+    same gates run on them (expected: seven `stated`, all custom constants
+    listed and anchored or not).
+- id: Q-20
+  severity: medium
+  status: open
+  title: no lean4checker release matches the Millennium pin
+  detail: The registry is on Lean v4.31.0; upstream lean4checker's newest tag
+    is v4.29.0-rc8. The checker at millennium/lean4checker is master (91a7f0e)
+    built with the toolchain overridden to v4.31.0; its bundled replay tests
+    pass. Decision 2 makes the checker required for proven, so a proven
+    at this pin rests on an unreleased checker build until upstream tags one.
+- id: Q-21
+  severity: medium
+  status: open (reframed by SEMANTICS.md: the registry locks ARE the demonstranda; anchoring is a descriptor of their worth, not a gate; six wrappers remain un-anchored to Mathlib names because Mathlib has none)
+  title: registry locks are locks on a name; the content lives in one custom constant
+  detail: >
+    Import found each clay_prize_* type is a single custom Prop
+    (ClayRiemannHypothesis, ClayNavierStokes, ...; ClayPVersusNPResolution
+    is a Type and its declaration a def). The lock therefore pins a name,
+    and statement fidelity is entirely the anchor's job. Until each Clay
+    wrapper is anchored by a checked Iff to a Mathlib-level statement (or,
+    where Mathlib has none, to a wrapper whose own constants bottom out in
+    Mathlib), "discharges the registry lock" means "proves a name". The
+    registry's own docs claim such equivalences (e.g. ClayRiemannHypothesis
+    to Mathlib's RiemannHypothesis); those theorems, if present, are the
+    first anchor nominations and must pass anchor_check like any other.
+  survey: >
+    2026-09-06 closure.py at the registry pin: all seven wrappers GROUNDED
+    (definitional closure ends in Mathlib; no axioms, opaque, or sorry in
+    any definition; Yang-Mills' wrapper does not reach PhysLean). Custom
+    constants in closure: PvsNP 22 (+ the resolution inductive), Riemann 5,
+    Navier-Stokes 60, Hodge 31, BSD 12, Yang-Mills 10, Poincare 6. Only
+    Riemann has an Iff to a Mathlib-NAMED statement (anchored via
+    iff_real_part + RealPart.iff_mathlib). The other six cannot be
+    Iff-anchored at this pin because Mathlib has no named statement for
+    them; their fidelity rests on the registry's definitions (grounded)
+    plus human/sieve review of those definitions (Q-5).
+- id: Q-22
+  severity: high
+  status: closed 2026-09-06 dissolved by SEMANTICS.md (owner: "proof requires demonstrandum"): proven = the demonstrandum's lock is discharged; grounded/anchored are descriptors of the demonstrandum and never gate status; "counts against a Millennium problem" is the registry lock relation
+  title: what "anchored" must mean for proven
+  detail: >
+    Two computed properties now exist per custom constant. ANCHORED: a
+    checked Iff/Eq chain to a Mathlib-named declaration (strong fidelity;
+    available for Riemann only among the seven). GROUNDED: the
+    definitional closure ends in the pinned libraries with nothing hidden
+    (available for all seven, and also for the induction-template control's private
+    predicate, which is a grounded def). The status rule today caps a
+    claim at `stated` unless every custom constant is ANCHORED, which
+    leaves six Millennium problems unreachable by any proof at this pin.
+  options: >
+    A (current): keep the Iff rule; six problems dead at this pin.
+    B (recommended): `proven` requires GROUNDED for every custom constant;
+    ANCHORED is recorded as a separate fidelity field; "counts against a
+    Millennium problem" stays a lock relation (registry_match, or a
+    checked Iff to a registry lock). Consequence: the induction-template control N1
+    computes `proven` as the implication it is, with `step` listed under
+    hypotheses and registry_match none; the mismatch is then caught by the
+    lock relation and the generated label (Q-5), not by a status. N1's
+    calibration requirement changes accordingly and Q-1 gets its rule
+    (conditional = proven with explicit Prop hypotheses that name claim
+    ids or are not discharged).
+- id: Q-23
+  severity: low
+  status: open
+  title: the runner has no smoke test; a refactor shipped with its main loop broken
+  detail: calibrate.py's per-claim gates were moved into evaluate() while a
+    run was in flight; that run (PASS 11/11) had loaded the pre-refactor
+    file, so the new main loop was first executed later and crashed on a
+    stale variable before any status was written. Nothing was misrecorded,
+    but a `--smoke` mode (one cheap control, no ket) should run before any
+    full run, and the run log should record the sha256 of the runner it ran.
+- id: Q-24
+  severity: low
+  status: open
+  title: ill-formed hypothesis-deletion mutants carry non-reproducible locks
+  detail: >
+    In corpus mutants-20260911, a hyp_del_k mutant whose deleted binder was
+    depended on by a later binder leaves a dangling free variable; pp.all prints
+    it with a process-specific `_uniq.N` name, so its recorded `lock` differs
+    between runs (found 2026-09-11: 37/37 such records mismatched a
+    byte-identical re-derivation via Quod.Mutate, while 17/17 elaborates=true
+    mutants and every swap matched). A lock is only defined for an elaborated
+    type; these records are `elaborates: false` and are already excluded from
+    attempts (ATTEMPTS.md §5) and from S4 as ill-formed.
+  fix: mutant_extract.py records `lock: null` (and `lock_changed: null`) when
+    `elaborates` is false; MutantWalk emits no canonical form for them. Apply on
+    the next corpus run; the existing corpus is unaffected for every use that
+    filters on elaborates.
+- id: Q-25
+  severity: medium
+  status: open
+  title: exit condition 6 (proposals attempted as `A ↔ B`) is vacuous over theorem pairs
+  detail: >
+    lemma's S5 proposals (L-5) pair two Mathlib THEOREMS A, B, both proven at
+    the pin. Any two proven closed propositions are equivalent — `⟨fun _ => B,
+    fun _ => A⟩` discharges `A ↔ B` — and the same holds pointwise under shared
+    binders (`∀ xs, P xs ↔ Q xs`, since both P xs and Q xs hold). The self-proof
+    gate (exit condition 2) cannot catch this: the Iff has its own lock, and A
+    and B are legitimately usable constants. "Discharged" would measure the
+    ladder finding two existing proofs, not an equivalence. Missed in design
+    review (ATTEMPTS.md rev 2 exit condition 6; lemma docs/prover-loop.md).
+    Found 2026-09-11 while preparing the attempt form; nothing was run.
+  fix: >
+    Pending the user's call (doctrine change). Proposals must pair
+    propositions whose truth is NOT already established: the sides of
+    Mathlib Iff theorems (corpus fields iff_lhs / iff_rhs; the pairs S5 was
+    trained on), Prop-valued definitions, or hypotheses. The demonstrandum for
+    sides L_i, L_j drawn from different Iff theorems with α-equivalent binder
+    telescopes is `∀ xs, L_i xs ↔ L_j xs`; a discharge is a new fact even when
+    it chains through the source Iffs (record the used constants as a
+    difficulty feature, do not exclude them). lemma's proposal generator and
+    the L-5 rerank move to that pool; until then exit condition 6 is blocked
+    and no `A ↔ B` run is made.

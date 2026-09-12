@@ -1,0 +1,38 @@
+{
+ "metrics": {
+  "best_step": 2750,
+  "classes": [
+   "proven",
+   "not_proven"
+  ],
+  "final_loss": 0.024692055080611796,
+  "label_audit": {
+   "attempts_considered": 6152,
+   "classes": [
+    "proven",
+    "not_proven"
+   ],
+   "label:no_proof_found": 6010,
+   "label:proven": 142,
+   "per_split": {
+    "test": 278,
+    "train": 4860,
+    "val": 251
+   },
+   "prover_filter": "ladder-A",
+   "support3": {
+    "no_proof_found": 6010,
+    "proven": 142
+   }
+  },
+  "ood_operator": "swap_lit_01",
+  "steps": 3000,
+  "train_class_counts": {
+   "0": 115,
+   "1": 4745
+  },
+  "train_rows": 4860,
+  "val_macro_f1_best": 0.8293
+ },
+ "run_id": "s4v2-verdict-20260911-223439"
+}
