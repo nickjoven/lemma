@@ -120,3 +120,28 @@
   detail: The Unigram trainer converged to 14,869 pieces on the compact readable_pp
     corpus; the model sizes itself to the true vocab, so this is correct behaviour.
     The filename runs/tokenizer/lean-unigram-32k.json is a nominal misnomer only.
+- id: L-7
+  severity: high
+  status: open
+  title: tier-A transitions are terminal (closed/error), so the W0 next-state gate has no test set
+  detail: >
+    quod theorems-A-t1 (manifest 6fe9d067..., 5,410 sample_mod-46 theorems,
+    ladder rfl/decide/simp/omega/exact?/aesop) emitted 26,130 transitions over
+    5,923 goal states, but only 511 are state-to-state single steps (one goal
+    in, a different goal out): 486 from simp, 23 from aesop; every other rung
+    either closes the goal or errors. Module-held-out single steps: 12. The
+    sealed W0 baselines (w0-baselines run, metrics fadd1511...) are therefore
+    saturated (identity 0.917, offset 1.000, lexical 1.000 on 12 candidates;
+    permutation 0.277) and cannot bound a learned predictor. Energy targets
+    ARE well populated (5,408 states, closure rate over six rungs, energy mean
+    1.16, 94 censored rows; table CID 19ba3da0...). Translation test: simp
+    displacements have mean norm 2.48 with spread 1.97 — not a translation.
+  fix: >
+    The corpus needs a prover that STEPS. Options, in order of cost: (a) a
+    stepping ladder (intro/constructor/ext/push_neg/norm_num/simp_all/
+    ring_nf...) as a NEW recorded prover config with its own pilot and frozen
+    P (ATTEMPTS.md decision 2 — a runner config change is a new prover, not
+    a tweak; needs Nick's call); (b) tier B search (source=search) whose
+    trajectories are multi-step by construction; (c) both, since the
+    adversarial loop (item 8) needs a searcher anyway. W0 training waits;
+    "JEPA" stays unused.
