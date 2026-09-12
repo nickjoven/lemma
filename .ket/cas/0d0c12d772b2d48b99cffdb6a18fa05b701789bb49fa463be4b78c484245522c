@@ -165,34 +165,3 @@
     prover question above is unchanged (true-statement trajectories are
     still 511 rows); a calibrated cost head (weight the survival term, or a
     discrete cap-hit head) is a cheap second run.
-    2026-09-12 RESOLVED for the retrieval gate — the stepping prover
-    (quod ladder-S, runs pilot-S 285ea472..., pilot-S-neg 501ae3fe...,
-    test200-S 91c94612...) added multi-step trajectories: corpus 107,427
-    transitions, 11,297 single steps (507 module-held-out, 1,089 on true
-    statements). Baselines re-sealed (d0f7a039...): identity 0.304, offset
-    0.577, lexical 0.456. W0 v2 (w0-world-20260912-124023, config unchanged except
-    the corpus inputs; eval d991f7e1..., calibration PASS): next-state MRR
-    0.733 vs bar 0.689 (offset 0.589 + 0.10), beats lexical by +27.8,
-    permutation 0.015; per tactic push_neg 0.975, simp 0.834, aesop 0.747,
-    simp_all 0.553, norm_num 0.527 (all above offset by >= 0.11), ring_nf
-    flagged translation on n=6 (unreliable). Outcome head macro-F1 0.597.
-    The world-model gate is passed; the cost head is NOT (see L-8). The
-    README's "encoders over a verified corpus" wording is a public-readiness
-    edit, deferred until that PR lands.
-- id: L-8
-  severity: medium
-  status: open
-  title: W0 cost head is not calibrated on censored (budget) rows
-  detail: >
-    W0 v1 and v2 (evals 4e493983..., d991f7e1...) predict a log-heartbeat
-    cost >= the cap for only 11% and 1.6% of the rows that actually hit the
-    cap (63 and 36 test rows), with MAE 0.75 in log-heartbeats on uncensored
-    rows. The Tobit survival term at weight 0.2 next to InfoNCE and outcome
-    CE is too weak, and censored rows are 1.4% of training rows.
-  fix: >
-    Cheap next run: (a) a discrete cap-hit head (binary, class-balanced) next
-    to the regression, evaluated by recall on censored rows; (b) weight the
-    survival term by the inverse censored fraction; (c) report cost per
-    transition against the measured Lean cost (wall_ms is recorded on every
-    row) as the plan requires. Gate for the cost head: censored recall
-    >= 0.5 at precision >= 0.5, and log-cost MAE <= 0.6 on uncensored rows.

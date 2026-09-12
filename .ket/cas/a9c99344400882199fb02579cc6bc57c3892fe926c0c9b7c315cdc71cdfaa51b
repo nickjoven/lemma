@@ -1,0 +1,62 @@
+{
+ "metrics": {
+  "accuracy": 0.9699,
+  "classes": [
+   "proven",
+   "not_proven"
+  ],
+  "f1_gate": 0.8,
+  "label_audit": {
+   "attempts_considered": 6152,
+   "classes": [
+    "proven",
+    "not_proven"
+   ],
+   "label:no_proof_found": 6010,
+   "label:proven": 142,
+   "per_split": {
+    "test": 278,
+    "train": 4860,
+    "val": 251
+   },
+   "prover_filter": "ladder-A",
+   "support3": {
+    "no_proof_found": 6010,
+    "proven": 142
+   }
+  },
+  "label_scope": "Phase-3b gate_verdict, prover-relative (prover filter: ladder-A)",
+  "macro_f1": 0.7066,
+  "macro_f1_bag_of_tokens": 0.526,
+  "macro_f1_ood": 0.4783,
+  "margin_pts": 18.1,
+  "ood_operator": "swap_lit_01",
+  "pass_f1": false,
+  "pass_margin": true,
+  "per_class": {
+   "not_proven": {
+    "f1": 0.9846,
+    "precision": 0.9846,
+    "recall": 0.9846,
+    "support": 259
+   },
+   "proven": {
+    "f1": 0.4286,
+    "precision": 0.4286,
+    "recall": 0.4286,
+    "support": 7
+   }
+  },
+  "permutation_macro_f1": 0.4865,
+  "test_class_counts": {
+   "not_proven": 259,
+   "proven": 7
+  },
+  "test_rows_iid": 266,
+  "test_rows_ood": 12,
+  "thin_classes": [
+   "proven"
+  ]
+ },
+ "run_id": "s4v2-eval-s4v2-verdict-20260911-223439"
+}

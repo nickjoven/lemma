@@ -1,0 +1,50 @@
+{
+ "tier": "A",
+ "exit_condition": 5,
+ "run": "mutants-A-r1",
+ "regate_of": "mutants-A",
+ "attempts": 6152,
+ "statement_mutants_in_corpus": 8187,
+ "elaborated_statement_mutants": 6152,
+ "note": "gate_verdict is prover-relative (ladder-A): proven = kernel + axiom gate + lean4checker accepted; no_proof_found = this ladder within this budget found nothing; 5 proven rows are dedup (mutant coincides with an existing theorem). Ill-formed (elaborates=false) mutants are not demonstranda (Q-24).",
+ "by_outcome": {
+  "no_proof_found": 6010,
+  "accepted": 142
+ },
+ "by_operator": {
+  "swap_eq_ne": {
+   "no_proof_found": 2902,
+   "accepted": 95
+  },
+  "hyp_del": {
+   "no_proof_found": 2494,
+   "accepted": 2
+  },
+  "swap_lit_01": {
+   "no_proof_found": 169,
+   "accepted": 4
+  },
+  "swap_ne_eq": {
+   "no_proof_found": 204,
+   "accepted": 19
+  },
+  "swap_and_or": {
+   "no_proof_found": 193,
+   "accepted": 21
+  },
+  "swap_or_and": {
+   "no_proof_found": 48,
+   "accepted": 1
+  }
+ },
+ "mutant_lock_audit": {
+  "verified": 6152,
+  "lock_mismatch": 0,
+  "not_in_corpus": 0
+ },
+ "dedup": 5,
+ "manifest_cid": "6f94741297b56ff12cecaadb24a3ab5bbdb8bcdbb9f2322332ee62d414b96eb8",
+ "attempts_cid": "7105030bae3c4e713919828b40b3b5155c7a7aa8f1909f7ecb45fe44baf3c11e",
+ "original_manifest_cid": "7e9d6da8ff06e35ca0af8bb0fc0447777f4437c1e2bb98474fa369842e880f22",
+ "pass": true
+}

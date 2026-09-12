@@ -1,0 +1,37 @@
+{
+ "controls": [
+  {
+   "expect": ">=0.8",
+   "id": "macro-f1",
+   "observed": 0.7065637065637066,
+   "ok": false
+  },
+  {
+   "expect": ">=0.1",
+   "id": "beats-bag-of-tokens",
+   "observed": 0.18060797215726798,
+   "ok": true
+  },
+  {
+   "expect": "<0.6",
+   "id": "permutation-sanity",
+   "observed": 0.4864864864864865,
+   "ok": true
+  },
+  {
+   "expect": "reported",
+   "id": "ood-operator",
+   "observed": 0.4782608695652174,
+   "ok": true
+  },
+  {
+   "expect": "every class >= 30 test rows (else flagged)",
+   "id": "class-support",
+   "observed": [
+    "proven"
+   ],
+   "ok": true
+  }
+ ],
+ "pass": false
+}

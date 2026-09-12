@@ -1,0 +1,57 @@
+{
+ "metrics": {
+  "energy": {
+   "censored_rows": 94,
+   "energy_mean": 1.1617,
+   "outcome_totals": {
+    "budget": 94,
+    "closed": 5259,
+    "error": 14853,
+    "open": 514
+   },
+   "states": 5408,
+   "states_with_closure": 5258
+  },
+  "energy_table_cid": "19ba3da09932ac8975a963e74eff09a5946405c4dcc33981e72babe3eb0df33d",
+  "gate_for_w0": {
+   "beat_lexical_by": 0.1,
+   "beat_offset_by": 0.1,
+   "note": "W0 must exceed max(mrr_offset, mrr_lexical) + 0.10 on module-held-out single-step transitions; tactics whose offset MRR is within the margin of W0 are 'translation' and get no GPU",
+   "translation_margin": 0.03
+  },
+  "mrr_identity": 0.9167,
+  "mrr_lexical": 1.0,
+  "mrr_offset": 1.0,
+  "mrr_offset_permuted": 0.2769,
+  "n_test_steps": 12,
+  "n_train_steps": 396,
+  "per_tactic_retrieval": {
+   "simp": {
+    "mrr_identity": 0.9167,
+    "mrr_offset": 1.0,
+    "n_test": 12
+   }
+  },
+  "translation_test": {
+   "aesop": {
+    "mean_norm": 1.8589,
+    "mu_norm": 1.3626,
+    "n": 20,
+    "spread": 1.9858
+   },
+   "intros": {
+    "mean_norm": 2.586,
+    "mu_norm": 2.586,
+    "n": 1,
+    "spread": 0.0
+   },
+   "simp": {
+    "mean_norm": 2.4821,
+    "mu_norm": 2.15,
+    "n": 375,
+    "spread": 1.973
+   }
+  }
+ },
+ "run_id": "w0-baselines-20260911-232844"
+}

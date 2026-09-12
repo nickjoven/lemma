@@ -1,0 +1,27 @@
+{
+ "tier": "S",
+ "prover": "ladder-S",
+ "exit_condition": 1,
+ "P_frozen": 0.28,
+ "P_frozen_manifest_cid": "285ea472037a1e606eda7321aa25459f0571a5c0931ec29235c30a8a41c1622b",
+ "test": {
+  "run": "test200-S",
+  "n": 200,
+  "accepted": 89,
+  "rate": 0.445,
+  "by_outcome": {
+   "rejected: self-proof": 108,
+   "accepted": 89,
+   "no_proof_found": 3
+  },
+  "manifest_cid": "91c9461231c87ec3ba95eb01e51997459625f5bfd0234171d5a8985a26a0269f",
+  "transitions": {
+   "n_transitions": 5005,
+   "n_goals": 555,
+   "censored": 42,
+   "on_accepted_path": 461
+  }
+ },
+ "pass": true,
+ "note": "rate on the 200-theorem test set vs P_S frozen from the disjoint 200-theorem pilot (controls-4242); self-proof rejections count as failures. The pilot/test gap (0.28 vs 0.445) is set difficulty, both sets nominated by seeded hash."
+}

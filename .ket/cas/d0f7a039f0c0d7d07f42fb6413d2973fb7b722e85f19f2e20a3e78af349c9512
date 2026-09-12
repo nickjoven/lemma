@@ -1,0 +1,118 @@
+{
+ "metrics": {
+  "energy": {
+   "censored_rows": 1665,
+   "energy_mean": 1.2246,
+   "outcome_totals": {
+    "budget": 1665,
+    "closed": 5863,
+    "error": 71534,
+    "open": 16203
+   },
+   "states": 13316,
+   "states_with_closure": 5833
+  },
+  "energy_table_cid": "6fdc00fea51c9ff637e98f1005c2eccc14790ad22236928eac2505b5e7982241",
+  "gate_for_w0": {
+   "beat_lexical_by": 0.1,
+   "beat_offset_by": 0.1,
+   "note": "W0 must exceed max(mrr_offset, mrr_lexical) + 0.10 on module-held-out single-step transitions; tactics whose offset MRR is within the margin of W0 are 'translation' and get no GPU",
+   "translation_margin": 0.03
+  },
+  "mrr_identity": 0.3041,
+  "mrr_lexical": 0.4555,
+  "mrr_offset": 0.577,
+  "mrr_offset_permuted": 0.0087,
+  "n_test_steps": 507,
+  "n_train_steps": 9588,
+  "per_tactic_retrieval": {
+   "aesop": {
+    "mrr_identity": 0.415,
+    "mrr_offset": 0.5935,
+    "n_test": 180
+   },
+   "norm_num": {
+    "mrr_identity": 0.2473,
+    "mrr_offset": 0.2439,
+    "n_test": 43
+   },
+   "push_neg": {
+    "mrr_identity": 0.3375,
+    "mrr_offset": 0.5835,
+    "n_test": 37
+   },
+   "ring_nf": {
+    "mrr_identity": 0.9167,
+    "mrr_offset": 0.8667,
+    "n_test": 6
+   },
+   "simp": {
+    "mrr_identity": 0.2017,
+    "mrr_offset": 0.7132,
+    "n_test": 191
+   },
+   "simp_all": {
+    "mrr_identity": 0.3061,
+    "mrr_offset": 0.3242,
+    "n_test": 43
+   }
+  },
+  "translation_test": {
+   "aesop": {
+    "mean_norm": 2.4485,
+    "mu_norm": 1.6094,
+    "n": 3291,
+    "spread": 4.9118
+   },
+   "constructor": {
+    "mean_norm": 1.8695,
+    "mu_norm": 0.745,
+    "n": 57,
+    "spread": 3.5028
+   },
+   "ext": {
+    "mean_norm": 1.6949,
+    "mu_norm": 1.1275,
+    "n": 39,
+    "spread": 2.7176
+   },
+   "intros": {
+    "mean_norm": 2.586,
+    "mu_norm": 2.586,
+    "n": 1,
+    "spread": 0.0
+   },
+   "norm_num": {
+    "mean_norm": 2.4625,
+    "mu_norm": 1.4503,
+    "n": 662,
+    "spread": 8.6066
+   },
+   "push_neg": {
+    "mean_norm": 1.1776,
+    "mu_norm": 0.5577,
+    "n": 727,
+    "spread": 1.753
+   },
+   "ring_nf": {
+    "mean_norm": 0.4577,
+    "mu_norm": 0.18,
+    "n": 361,
+    "spread": 0.755
+   },
+   "simp": {
+    "mean_norm": 2.7176,
+    "mu_norm": 2.0458,
+    "n": 3806,
+    "spread": 4.3893
+   },
+   "simp_all": {
+    "mean_norm": 2.512,
+    "mu_norm": 1.5433,
+    "n": 644,
+    "spread": 8.7846
+   }
+  }
+ },
+ "run_id": "w0-baselines-20260912-124021"
+}

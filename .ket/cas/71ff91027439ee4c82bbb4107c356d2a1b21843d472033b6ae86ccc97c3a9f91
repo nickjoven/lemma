@@ -1,0 +1,19 @@
+{
+ "metrics": {
+  "best_step": 3250,
+  "final_loss": 0.30995495557785036,
+  "steps": 4000,
+  "tactics": [
+   "aesop",
+   "decide",
+   "exact?",
+   "omega",
+   "rfl",
+   "simp"
+  ],
+  "train_rows": 47157,
+  "train_single_step": 5903,
+  "val_mrr_best": 0.843
+ },
+ "run_id": "w0-world-20260912-012400"
+}
