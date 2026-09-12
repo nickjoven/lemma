@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "title": "ladder-S passes; W0 v2 passes gate; tier B sealed, awaiting go",
+  "summary": "2026-09-12: quod ladder-S (stepping prover) exit 1+3 PASS (P_S 0.28 frozen 285ea472; test 0.445; not-T 0/200); transition corpus 107,427 rows; lemma W0 v2 PASSES next-state gate (MRR 0.733 vs 0.689, eval d991f7e1); L-8 cost head open. Tier B driver scripts/attempt_b.py sealed pre-manifest 7bb7a71e; blocked on ANTHROPIC_WORKSPACE_ID + Nick's go. Q-25 non-vacuous form accepted, not yet built.",
+  "artifacts": [
+    {
+      "name": "OPEN.yml",
+      "cid": "4d907d9ec9f70edf748087985253596b77ffad44df852275ecade3a0e9b236bf"
+    },
+    {
+      "name": "ledger.jsonl",
+      "cid": "a9865d31f4ee1b8c943dcd202d60102432bd9d04a6fdbc7e7f6e101ca06452e6"
+    },
+    {
+      "name": "MANIFEST.yml",
+      "cid": "fdeb475fc007f662d89609d70631bee4b33cbd3a891553c021de32606a30a639"
+    },
+    {
+      "name": "w0_world.yaml",
+      "cid": "454de8507e7952854cfe89dc52c851249ce7ef7c3c31467c17641c30a29ddb1b"
+    },
+    {
+      "name": "OPEN.yml",
+      "cid": "063633aee6b4806b27c425ec351ab26f84472a67e01ee6e848e99faa4cd4d6b8"
+    },
+    {
+      "name": "exit1-ladderS.json",
+      "cid": "b0781debf1bbeaad46f873c53612ce4459158d696f78c6413c87927ef994823f"
+    },
+    {
+      "name": "manifest-pre-pilot-B.json",
+      "cid": "7bb7a71e2de12140025b5a0dcf84239866c02c31f78537be38c6e12e4e1d04b3"
+    }
+  ],
+  "meta": {
+    "catbus_packet": "true",
+    "lemma_head": "160bf3b",
+    "quod_branch": "attempts-impl",
+    "quod_head": "5bf2ec4"
+  },
+  "cdom": null
+}

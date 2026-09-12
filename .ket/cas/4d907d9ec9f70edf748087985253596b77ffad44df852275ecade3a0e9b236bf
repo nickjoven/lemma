@@ -1,0 +1,198 @@
+# Every known problem with the ML track, in view. Rule (inherited from quod,
+# 2026-09-06): a gap that is known and unlisted is a defect of this ledger,
+# not of the gap.
+# status: open | fix-pending (code written, run not yet recorded) | closed <date> <how>
+# severity: high = a cited metric can be wrong or unreproducible; medium = a
+#           capability gap or a failed stage gate; low = cost, ergonomics, or
+#           a by-design limit worth stating.
+- id: L-1
+  severity: medium
+  status: open
+  title: S3 gloss tower is representation-limited; same-module hard-drift AUC 0.807 < 0.90 gate
+  detail: >
+    Two S3 runs failed the gate on held-out modules. v1 (s3-gloss-20260910-174141,
+    eval ca34a4b7...): hard AUC 0.767, retrieval MRR 0.398. v2 with module-grouped
+    hard-negative batches and val early stopping (s3-gloss-20260911-012141, eval
+    3d8a926c...): hard AUC 0.807, retrieval MRR 0.400 — mining gave +0.04 but the
+    val probe saturated at ~0.84 and retrieval did not move at all. The statement
+    tower is strong (S2 same-lock MRR 0.992); the gloss tower is the limit: English
+    docstrings are byte-fallbacked by the Lean-only tokenizer (CID 3b33be81...) and
+    the shared encoder was MLM-pretrained on Lean statements only. This is a
+    representation deficit, not a tuning gap. The model remains useful for gross
+    prose/statement mismatch (easy-drift AUC 0.977; 93.7% of matched pairs clear
+    the 90th percentile of random mismatches), which is the practical quod Q-5 case.
+  fix: >
+    Either (a) a gloss-capable tokenizer trained on docstrings+statements and an
+    MLM pretraining pass over both (a NEW tokenizer pin — changes the corpus
+    contract for every downstream stage, so do it deliberately, not mid-stream), or
+    (b) a pinned external prose encoder for the gloss tower with its checkpoint
+    content-addressed — a doctrine decision (the plan excluded external artifacts).
+    Decided 2026-09-11: record and move on; revisit with (a) when a tokenizer
+    re-pin is planned.
+- id: L-2
+  severity: medium
+  status: open
+  title: S3's exact drift eval (docstring x gate-verified mutant) is deferred
+  detail: >
+    The plan's S3 criterion pairs a docstring with a gate-verified MUTANT of its
+    statement. That corpus (Phase 3: mutants.jsonl with gate verdicts) is not
+    built, so evaluate_s3.py gates on the strongest mutant-free proxy — same-module
+    hard negatives — and records the exact test as deferred in every eval record.
+  fix: build the Phase-3 mutant corpus (see L-3), then add the mutant-pair AUC to
+    evaluate_s3.py as the primary gate.
+- id: L-3
+  severity: medium
+  status: closed 2026-09-11 by quod corpus mutants-20260911 (manifest CID 06622cff...7f57), 19,007 mutants over 5,410 sampled theorems, Phase-3a labels (elaborates, lock_changed, operator; proof-side verdicts by construction). Statement-mutant gate_verdict remains Phase-3b (see L-2).
+  title: S4 (mutant verdict predictor) is blocked on the Phase-3 mutant corpus
+  detail: >
+    No mutants.jsonl exists. It requires an Expr-level mutation walker in quod
+    (binder-level hypothesis deletion, curated constant swaps, sorry/axiom
+    injection) with per-mutant gate labels (lock_changed -> elaborates ->
+    gate_verdict). CPU/Lean-bound; parallelizable with GPU training. Also
+    unblocks L-2.
+- id: L-5
+  severity: medium
+  status: open
+  title: S5 proposals ranked by raw cosine are dominated by boilerplate near-duplicates
+  detail: >
+    S5 passed its gate (s5-equiv-20260911-125959, eval 1a0ed42c...: known-Iff
+    MRR 0.564 >= 0.5, dedup 0.974, permutation 0.496) and emitted 100 novel
+    proposals (CID f865e4ea...). But the top of that list is score-1.000 pairs
+    inside one namespace (Algebra.Generators.Hom.*: congr_simp / equivAlgHom_*
+    / comp_id) — auto-generated lemma variants with near-identical readable
+    forms, not non-obvious equivalences. Submitting these to the gates would
+    mostly confirm trivialities. The plan's real test (>= 10 of top 100
+    discharged) is only meaningful on a list that excludes such pairs.
+  fix: before gate submission, rerank proposals with a lexical-overlap penalty
+    (e.g. token-Jaccard of the readable forms) and a same-namespace / same-
+    module penalty, and require distinct locks whose canonical forms differ
+    beyond binder names; then re-emit and submit. Gate submission itself needs
+    a prover-in-the-loop (the gates verify a given proof; they do not find one)
+    — a separate stage to design.
+    2026-09-11 (quod Q-25) — the pool itself is wrong, not just its order;
+    every proposal pairs two THEOREMS, and two proven statements are always
+    equivalent as propositions, so attempting `A ↔ B` at the gates is vacuous.
+    The rerank is deferred until the proposal generator draws from
+    propositions whose truth is not already established (Iff sides
+    `iff_lhs`/`iff_rhs` in the corpus, Prop-valued definitions) under shared
+    binders; that is a doctrine change awaiting the user's call.
+- id: L-6
+  severity: medium
+  status: open
+  title: S4 v1 elaborates-predictor beats the bag-of-tokens baseline by only 6 pts and collapses on an unseen operator
+  detail: >
+    Run s4-verdict-20260911-152400 (sealed 40a2b7f7..., best val F1 0.936 @
+    1500), held-out eval 3690e8f2... (calibration_failed): elaborates macro-F1
+    0.941 (gate 0.80 PASS) but a bag-of-tokens logistic baseline reaches 0.880
+    (+6.1 pts, gate >= 10 FAIL), and on the held-out operator swap_lit_01 the
+    model scores 0.305 macro-F1 (near one-class). Operator identification 0.850.
+    Reading: the Phase-3a `elaborates` label is largely LEXICALLY predictable for
+    these operators (a `0` beside a `ℕ+`), so the task is too easy for a trivial
+    baseline and the model learns operator-specific surface patterns rather than
+    a general notion of well-typedness — exactly the distribution-shift failure
+    the plan's OOD control exists to expose. Test n is small (326 IID / 65 OOD;
+    5% module split of 8,187 statement mutants).
+  fix: >
+    (a) the substantive target is `gate_verdict` on statement mutants (does the
+    mutated claim still hold?), which needs Phase-3b proof attempts (L-2) — a
+    prover-in-the-loop stage; (b) a larger mutant sample (sample_mod 46 -> ~10)
+    for a usable test set; (c) operators that are not lexically trivial
+    (e.g. hypothesis WEAKENING/STRENGTHENING, quantifier swaps) so the baseline
+    cannot shortcut. Until then, cite S4 only as "operator-conditional elaborates
+    on this mutant distribution", never as a verdict predictor.
+    2026-09-12 — S4 v2 on the Phase-3b label (fix a delivered): run
+    s4v2-verdict-20260911-223439 on quod attempts mutants-A-r1 (6,152
+    lock-verified rows, prover ladder-A, classes collapsed to proven vs
+    not_proven because `rejected` has 0 support), eval metrics
+    a9c99344... (calibration_failed): macro-F1 0.707 (gate 0.80 FAIL) but
+    bag-of-tokens 0.526 → margin +18.1 pts (gate >= 10 PASS; the condition
+    that gates the world model is cleared), permutation 0.49, OOD
+    swap_lit_01 0.478. The failing number is macro-F1 over a `proven`
+    class with 7 test rows (2.3% of the ladder's attempts succeed) — an
+    under-powered gate, not evidence about the model. Fix (b) stands with a
+    sharper form — more PROVEN rows (a stronger prover tier B, or every
+    parent rather than sample_mod 46) — before the absolute gate means
+    anything; val best 0.829 at step 2750.
+- id: L-4
+  severity: low
+  status: open
+  title: tokenizer file is named 32k but has ~14.9k effective pieces
+  detail: The Unigram trainer converged to 14,869 pieces on the compact readable_pp
+    corpus; the model sizes itself to the true vocab, so this is correct behaviour.
+    The filename runs/tokenizer/lean-unigram-32k.json is a nominal misnomer only.
+- id: L-7
+  severity: high
+  status: open
+  title: tier-A transitions are terminal (closed/error), so the W0 next-state gate has no test set
+  detail: >
+    quod theorems-A-t1 (manifest 6fe9d067..., 5,410 sample_mod-46 theorems,
+    ladder rfl/decide/simp/omega/exact?/aesop) emitted 26,130 transitions over
+    5,923 goal states, but only 511 are state-to-state single steps (one goal
+    in, a different goal out): 486 from simp, 23 from aesop; every other rung
+    either closes the goal or errors. Module-held-out single steps: 12. The
+    sealed W0 baselines (w0-baselines run, metrics fadd1511...) are therefore
+    saturated (identity 0.917, offset 1.000, lexical 1.000 on 12 candidates;
+    permutation 0.277) and cannot bound a learned predictor. Energy targets
+    ARE well populated (5,408 states, closure rate over six rungs, energy mean
+    1.16, 94 censored rows; table CID 19ba3da0...). Translation test: simp
+    displacements have mean norm 2.48 with spread 1.97 — not a translation.
+  fix: >
+    The corpus needs a prover that STEPS. Options, in order of cost: (a) a
+    stepping ladder (intro/constructor/ext/push_neg/norm_num/simp_all/
+    ring_nf...) as a NEW recorded prover config with its own pilot and frozen
+    P (ATTEMPTS.md decision 2 — a runner config change is a new prover, not
+    a tweak; needs Nick's call); (b) tier B search (source=search) whose
+    trajectories are multi-step by construction; (c) both, since the
+    adversarial loop (item 8) needs a searcher anyway.
+    2026-09-12 update — quod mutants-A-t1 (manifest 847bcbce...) changed the
+    count: on MUTANTS, simp and aesop leave goals open instead of closing, so
+    the wired corpus has 69,040 transitions, 7,331 single steps (simp 3,927,
+    aesop 3,401), 284 module-held-out. Baselines re-sealed (metrics
+    25c962b5...): identity 0.321, offset 0.792, lexical 0.579, permuted 0.021;
+    energy table over 11,545 states, 880 censored. W0 v1 trained (w0-world-20260912-012400,
+    val MRR best 0.843 @ 3250; eval 4e493983..., calibration_failed):
+    next-state MRR 0.883 vs bar 0.895 (offset 0.795 + 0.10) — FAIL by 1.2
+    pts; beats lexical by +30.4; permutation 0.025; per tactic aesop 0.846 vs
+    offset 0.717 (+12.9, passes), simp 0.925 vs 0.871 (+5.5, does not);
+    outcome-head macro-F1 0.596 over closed/error/open/budget (support
+    245/2047/311/36); cost head MAE 0.76 in log-heartbeats on uncensored rows
+    and predicts >= cap for only 11% of censored rows (mis-calibrated).
+    Reading: the per-tactic mean offset is a strong predictor for simp
+    (rewriting moves goals along a consistent direction); the learned model
+    adds most on aesop. Caveat on the corpus itself: 93% of the single steps
+    are on MUTANT goals (mostly false statements), so W0 v1 has learned the
+    dynamics of failing searches. "JEPA" stays unused. Next: the stepping
+    prover question above is unchanged (true-statement trajectories are
+    still 511 rows); a calibrated cost head (weight the survival term, or a
+    discrete cap-hit head) is a cheap second run.
+    2026-09-12 RESOLVED for the retrieval gate — the stepping prover
+    (quod ladder-S, runs pilot-S 285ea472..., pilot-S-neg 501ae3fe...,
+    test200-S 91c94612...) added multi-step trajectories: corpus 107,427
+    transitions, 11,297 single steps (507 module-held-out, 1,089 on true
+    statements). Baselines re-sealed (d0f7a039...): identity 0.304, offset
+    0.577, lexical 0.456. W0 v2 (w0-world-20260912-124023, config unchanged except
+    the corpus inputs; eval d991f7e1..., calibration PASS): next-state MRR
+    0.733 vs bar 0.689 (offset 0.589 + 0.10), beats lexical by +27.8,
+    permutation 0.015; per tactic push_neg 0.975, simp 0.834, aesop 0.747,
+    simp_all 0.553, norm_num 0.527 (all above offset by >= 0.11), ring_nf
+    flagged translation on n=6 (unreliable). Outcome head macro-F1 0.597.
+    The world-model gate is passed; the cost head is NOT (see L-8). The
+    README's "encoders over a verified corpus" wording is a public-readiness
+    edit, deferred until that PR lands.
+- id: L-8
+  severity: medium
+  status: open
+  title: W0 cost head is not calibrated on censored (budget) rows
+  detail: >
+    W0 v1 and v2 (evals 4e493983..., d991f7e1...) predict a log-heartbeat
+    cost >= the cap for only 11% and 1.6% of the rows that actually hit the
+    cap (63 and 36 test rows), with MAE 0.75 in log-heartbeats on uncensored
+    rows. The Tobit survival term at weight 0.2 next to InfoNCE and outcome
+    CE is too weak, and censored rows are 1.4% of training rows.
+  fix: >
+    Cheap next run: (a) a discrete cap-hit head (binary, class-balanced) next
+    to the regression, evaluated by recall on censored rows; (b) weight the
+    survival term by the inverse censored fraction; (c) report cost per
+    transition against the measured Lean cost (wall_ms is recorded on every
+    row) as the plan requires. Gate for the cost head: censored recall
+    >= 0.5 at precision >= 0.5, and log-cost MAE <= 0.6 on uncensored rows.
