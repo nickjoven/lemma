@@ -1,0 +1,34 @@
+{
+ "controls": [
+  {
+   "expect": ">=0.689 (max(offset, lexical)+0.10)",
+   "id": "next-state-mrr",
+   "observed": 0.733317366055349,
+   "ok": true
+  },
+  {
+   "expect": "<0.2",
+   "id": "permutation-sanity",
+   "observed": 0.014574585279334166,
+   "ok": true
+  },
+  {
+   "expect": "reported per class",
+   "id": "outcome-support",
+   "observed": {
+    "budget": 63,
+    "closed": 263,
+    "error": 3462,
+    "open": 746
+   },
+   "ok": true
+  },
+  {
+   "expect": "censored rows scored as survival, not values",
+   "id": "cost-censoring",
+   "observed": 0.015873015873015872,
+   "ok": true
+  }
+ ],
+ "pass": true
+}
