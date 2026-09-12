@@ -143,5 +143,25 @@
     P (ATTEMPTS.md decision 2 — a runner config change is a new prover, not
     a tweak; needs Nick's call); (b) tier B search (source=search) whose
     trajectories are multi-step by construction; (c) both, since the
-    adversarial loop (item 8) needs a searcher anyway. W0 training waits;
-    "JEPA" stays unused.
+    adversarial loop (item 8) needs a searcher anyway.
+    2026-09-12 update — quod mutants-A-t1 (manifest 847bcbce...) changed the
+    count: on MUTANTS, simp and aesop leave goals open instead of closing, so
+    the wired corpus has 69,040 transitions, 7,331 single steps (simp 3,927,
+    aesop 3,401), 284 module-held-out. Baselines re-sealed (metrics
+    25c962b5...): identity 0.321, offset 0.792, lexical 0.579, permuted 0.021;
+    energy table over 11,545 states, 880 censored. W0 v1 trained (w0-world-20260912-012400,
+    val MRR best 0.843 @ 3250; eval 4e493983..., calibration_failed):
+    next-state MRR 0.883 vs bar 0.895 (offset 0.795 + 0.10) — FAIL by 1.2
+    pts; beats lexical by +30.4; permutation 0.025; per tactic aesop 0.846 vs
+    offset 0.717 (+12.9, passes), simp 0.925 vs 0.871 (+5.5, does not);
+    outcome-head macro-F1 0.596 over closed/error/open/budget (support
+    245/2047/311/36); cost head MAE 0.76 in log-heartbeats on uncensored rows
+    and predicts >= cap for only 11% of censored rows (mis-calibrated).
+    Reading: the per-tactic mean offset is a strong predictor for simp
+    (rewriting moves goals along a consistent direction); the learned model
+    adds most on aesop. Caveat on the corpus itself: 93% of the single steps
+    are on MUTANT goals (mostly false statements), so W0 v1 has learned the
+    dynamics of failing searches. "JEPA" stays unused. Next: the stepping
+    prover question above is unchanged (true-statement trajectories are
+    still 511 rows); a calibrated cost head (weight the survival term, or a
+    discrete cap-hit head) is a cheap second run.
