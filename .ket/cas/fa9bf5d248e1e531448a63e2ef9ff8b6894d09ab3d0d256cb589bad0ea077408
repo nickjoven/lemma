@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "title": "OpenAI NS intake proven; homeserv compute pair; tier B test paused on credit",
+  "summary": "2026-09-13: OpenAI Navier-Stokes intake DONE at its pin — both breakdown claims PROVEN (lock equality, axiom triple, independent lean4checker over 610 modules exit 0, closure grounded; fidelity to DeepMind original equal in all 14 canonical forms as a descriptor; RESULTS c570f56e). homeserv worker/controller roles shipped (bef5a7d). tier B test200-B paused at round 2 (152/200) on API credit; not-T control staged. LOCAL.md design = quod PR #4 (branch local-ecosystem). Open for Nick: credit, partner box pairing, model admission, vocab nominations.",
+  "artifacts": [
+    {
+      "name": "OPEN.yml",
+      "cid": "4d907d9ec9f70edf748087985253596b77ffad44df852275ecade3a0e9b236bf"
+    },
+    {
+      "name": "MANIFEST.yml",
+      "cid": "f4965c1d90133d0a5cc11cbec0e61bf5d2bb69d8f63aeaad08c2255e5946be2b"
+    },
+    {
+      "name": "OPEN.yml",
+      "cid": "063633aee6b4806b27c425ec351ab26f84472a67e01ee6e848e99faa4cd4d6b8"
+    },
+    {
+      "name": "RESULTS.json",
+      "cid": "c570f56ea7a8ba6bad05df766af171737912c4483668c6f132090089fde7bd91"
+    },
+    {
+      "name": "openai-ns-r3.yml",
+      "cid": "cd8f78643a41bd43408db39b61c4e6a1da4e4c9c223699e31af0c36cf6d95fc4"
+    },
+    {
+      "name": "openai-ns-periodic.yml",
+      "cid": "855e92859ef30703a6af1ea745c93a6894d832fa988e5eba5008e2be680bf89d"
+    }
+  ],
+  "meta": {
+    "catbus_packet": "true",
+    "lemma_head": "e4357b7",
+    "quod_head": "6ecea65"
+  },
+  "cdom": null
+}
