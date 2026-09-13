@@ -1,0 +1,580 @@
+{
+ "run_id": "pilot-B2",
+ "prover": "tier-B",
+ "prover_config": {
+  "prover": "tier-B",
+  "model": "claude-opus-5",
+  "model_created_at": "2026-07-24 00:00:00+00:00",
+  "effort": "high",
+  "workspace_header": true,
+  "max_tokens": 16000,
+  "rounds": 16,
+  "levels": [
+   1,
+   4,
+   16
+  ],
+  "protocol": "one batch per round over open demonstranda; full history of proposals + Lean errors; drop at first gate-accepted proof; stepwise replay via AttemptWalk CORPUS_SCRIPTS",
+  "system_prompt_sha256": "4498012a56fafad53ece21ca649b5b13d8c2d6c79563f563695ef7014b18f88d",
+  "heartbeats_per_step": 20000000,
+  "walker_sha256": "f215175c853cbf6bd44df40ef6d67a2023a68e061b0eb78c057d7747873d633e",
+  "forbidden_tactics": [
+   "exact?",
+   "apply?",
+   "rw?",
+   "simp?",
+   "aesop?",
+   "hint",
+   "sorry",
+   "admit",
+   "native_decide"
+  ],
+  "self_proof_gate": "name hidden; any accepted term using the demonstrandum's name or a same-lock constant is rejected: self-proof and counts as a failure for P"
+ },
+ "prover_config_cid": "7d0173f9632853031943c36f9c998e4098d1c98c0f8561b5147e0c5cf9c0d820",
+ "cap_cents": 6000,
+ "prices_usd_per_mtok": {
+  "input": 2.5,
+  "output": 12.5,
+  "cache_write": 3.125,
+  "cache_read": 0.25
+ },
+ "set": {
+  "controls": "attempts/controls-1337.json",
+  "which": "pilot",
+  "n": 50,
+  "sha256": "0663ba70662a428bb4a3e35eaea9ac594fc0bd2e480ff1d1405e8927d84388c1",
+  "cid": "32cbdc046ad586d68e3a04b97a004ccff143fae8174942c255719cf3d1fe8819"
+ },
+ "tier_a_failed_subset": [
+  "Action.Functor.mapActionPreservesColimitsOfShapeOfPreserves",
+  "ArithmeticFunction.isMultiplicative_zeta",
+  "Cardinal.power_le_power_right",
+  "CategoryTheory.InitiallySmall.mk'",
+  "CategoryTheory.Limits.IsLimit.hom_isIso",
+  "CategoryTheory.Limits.PullbackCone.pasteVert.congr_simp",
+  "CategoryTheory.MonoOver.isIso_iff_isIso_left",
+  "CategoryTheory.MorphismProperty.RightFraction.exists_leftFraction",
+  "CategoryTheory.id_of_comp_right_id",
+  "CategoryTheory.induct_on_objects",
+  "Complex.comap_exp_nhds_zero",
+  "Complex.integerComplement.ne_zero",
+  "Composition.sizeUpTo_succ",
+  "FreeAddMonoid.of_injective",
+  "Ideal.height_le_spanRank_toENat",
+  "IntermediateField.normal_iff_forall_map_eq",
+  "List.insertIdx_injective",
+  "Matrix.IsHermitian.mulVec_eigenvectorBasis",
+  "Matroid.Indep.subset_finite_isBasis'_of_subset_of_isRkFinite",
+  "Module.Relations.Solution.\u03c0_comp_map_apply",
+  "Monotone.comp_le_comp_left",
+  "Nat.div_dvd_div_left",
+  "NormedSpace.normalize_smul",
+  "Order.krullDim_eq_iSup_coheight",
+  "Polynomial.X_pow_mul_assoc",
+  "Quiver.stronglyConnectedComponent_singleton_iff",
+  "Real.Angle.toReal_coe_eq_self_add_two_pi_iff",
+  "RightPreLieRing.assoc_symm'",
+  "SSet.degenerate_le_preimage",
+  "SimpleGraph.Walk.concatRec_concat",
+  "WeierstrassCurve.ofJ_ne_0_ne_1728",
+  "WeierstrassCurve.\u03a8_one",
+  "WithCStarModule.norm_equiv_le_norm_prod",
+  "neg_nsmul"
+ ],
+ "prompt_cid": "7847db00aec681ac40d4781a1def35f0b151d44fe0287c4646cf426e0859f84c",
+ "pins": {
+  "lean": "v4.28.0",
+  "mathlib": "8f9d9cff6bd728b17a24e163c9402775d9e6a365",
+  "jin": "f9d5c8d39bece41ceedf6346ef50ad1fb393260e",
+  "lean4checker": "66e11cea12f5ba215d76b15b7f8495141bf52c6c"
+ },
+ "scripts": {
+  "AttemptWalk.lean": "f215175c853cbf6bd44df40ef6d67a2023a68e061b0eb78c057d7747873d633e",
+  "CorpusWalk.lean": "0a5905399209f116d806e9c4eaedca421322ccadd14390c7ffd2e5a402469847",
+  "MutantWalk.lean": "0d9d4e804cef411a0a473ed3a42a51bcbc398f69bee97627e7106c2734452681",
+  "anchor_check.py": "fce5cb95d06ee268bb120adf414e262da39b32a39c8e69b9be9680e53b0cfdf0",
+  "attempt.py": "6adbd81bee9cf2105635499c2b7ae715df28bd4d06cdc504d3061ee823015096",
+  "attempt_b.py": "26156414966dee0674b994cf63ac3862901e49cf871709efecef244bd86345d8",
+  "axiom_gate.py": "aed923bbb7ce405f9a61b9bb58bf2ae4c7df9f7810d21329126cb64dc50992b4",
+  "bootstrap.sh": "b9bc80ef5e99af7831ceaa9c990619bae35d49dababff2aed176afc407ba0c10",
+  "calibrate.py": "4f481f1f6765bee64a02c3c114f92810bb8c96d37698589d839dc4291b495420",
+  "closure.py": "644e45922f305aeaa7d5b6b3b5e4e00613365dda5a499c8cc68e29c15ed2bcf6",
+  "controls.py": "0e7db5332722d42874d0db174a9b643e2535a47819ffa918a73e548c7545a3eb",
+  "corpus_extract.py": "b96566c079939b57b61a5e613bb96b48bb503d58bd45ccb94e10853ffdc48e94",
+  "dag_depth.py": "ffb0fccee5181250c39820ce33662b2178807c1d76ecf1d75327b3cbb60dfda6",
+  "derive_pairs.py": "ffcba431b8f55e1b93b9ac42973a218b17d19444f47700fbd283d59dd6998f08",
+  "hyp_mutant.py": "c6d6a5d2789f37f1af8a7a9059b44f2e81bc23c4dcf1b1299c5cf89185c570dd",
+  "leanenv.py": "3858a5564b21638e48d68695ce80867f979ad28df2c2f429573cbe5c7d8fe690",
+  "lock.py": "44701e8ce72cbf8b0876a0025c10fd3f1c5e8039d033ec2bdf93092fd6f88ebc",
+  "mutant_extract.py": "051b37be5c8903f098d1be581a57a7cdb4e64c304e9385f5c9d2aa7387ffa969",
+  "refute_check.py": "0c3d689275e236318ea54292726072999737c064650519f55a8caf4f9966ccc9",
+  "registry_import.py": "7e55ef8c699ef6d50a8294c1fcc8c5498c67132ab98c3daf8c6db684cf3fcf20"
+ },
+ "prior_spend_cents": 351.38,
+ "prior_note": "pilot-B rounds 1-2 voided (attempts/pilot-B/void.json): batches msgbatch_011SA8UJ6nY3zD4WVUNa1fx5, msgbatch_01ATdL5yXMvL3bzNHN1nDZtj",
+ "sealed_before_run": "2026-09-12T20:34:58-0400",
+ "rounds_run": 16,
+ "spend_cents": 2529.7,
+ "usage": {
+  "input": 196635,
+  "output": 1703334,
+  "cache_write": 0,
+  "cache_read": 0
+ },
+ "round_costs_cents": [
+  345.0,
+  197.4,
+  152.5,
+  125.1,
+  141.8,
+  143.0,
+  141.2,
+  117.8,
+  102.4,
+  102.5,
+  102.6,
+  102.7,
+  102.8,
+  102.9,
+  103.0,
+  95.6
+ ],
+ "refusals": 0,
+ "selfproof_rejections": 2,
+ "P": {
+  "P_B(1)": {
+   "all": 0.74,
+   "tier_a_failed": 0.6471
+  },
+  "P_B(4)": {
+   "all": 0.86,
+   "tier_a_failed": 0.7941
+  },
+  "P_B(16)": {
+   "all": 0.92,
+   "tier_a_failed": 0.8824
+  }
+ },
+ "frozen": true,
+ "accepted": {
+  "SSet.degenerate_le_preimage": 1,
+  "Composition.sizeUpTo_succ": 1,
+  "List.insertIdx_injective": 1,
+  "ArithmeticFunction.isMultiplicative_zeta": 1,
+  "Finset.mulAction.eq_1": 1,
+  "CategoryTheory.Limits.IsLimit.hom_isIso": 1,
+  "Matroid.Indep.subset_finite_isBasis'_of_subset_of_isRkFinite": 1,
+  "FreeAddMonoid.of_injective": 1,
+  "Unitary.map_id": 1,
+  "NormedSpace.normalize_smul": 1,
+  "SimpleGraph.Walk.concatRec_concat": 16,
+  "Ideal.height_le_spanRank_toENat": 8,
+  "WeierstrassCurve.ofJ_ne_0_ne_1728": 1,
+  "CategoryTheory.MorphismProperty.RightFraction.exists_leftFraction": 1,
+  "Complex.integerComplement.ne_zero": 1,
+  "CategoryTheory.Limits.PullbackCone.pasteVert.congr_simp": 1,
+  "Nat.div_dvd_div_left": 1,
+  "CategoryTheory.MonoOver.isIso_iff_isIso_left": 2,
+  "CategoryTheory.Limits.pushout.inl_desc": 1,
+  "CategoryTheory.Limits.Cones.extendId_hom_hom": 1,
+  "WeierstrassCurve.\u03a8_one": 1,
+  "CategoryTheory.id_of_comp_right_id": 1,
+  "CategoryTheory.induct_on_objects": 3,
+  "Cardinal.power_le_power_right": 1,
+  "CategoryTheory.InitiallySmall.mk'": 1,
+  "Complex.comap_exp_nhds_zero": 2,
+  "Polynomial.X_pow_mul_assoc": 2,
+  "neg_nsmul": 1,
+  "CategoryTheory.Limits.hasFiniteColimits_of_hasColimits": 1,
+  "Real.Angle.toReal_coe_eq_self_add_two_pi_iff": 1,
+  "Order.krullDim_eq_iSup_coheight": 1,
+  "Subsemigroup.op_top": 1,
+  "Subgroup.quotientiInfEmbedding_apply": 1,
+  "Set.Finite.inv": 1,
+  "maximal_true": 1,
+  "Quiver.stronglyConnectedComponent_singleton_iff": 1,
+  "Field.finInsepDegree_def'": 1,
+  "Module.Relations.Solution.\u03c0_comp_map_apply": 7,
+  "RightPreLieRing.assoc_symm'": 3,
+  "WittVector.ghostComponent.eq_1": 1,
+  "CategoryTheory.PreGaloisCategory.PointedGaloisObject.comp_val": 1,
+  "Sym2.mkEmbedding_apply": 1,
+  "Monotone.comp_le_comp_left": 1,
+  "GroupNormClass.toNormedCommGroup_norm_eq": 1,
+  "Matrix.gram_apply": 1,
+  "CategoryTheory.Preadditive.neg_comp_neg_assoc": 2
+ },
+ "transitions": {
+  "n_transitions": 338,
+  "rounds": [
+   {
+    "round": 1,
+    "n_transitions": 278,
+    "n_goals": 198,
+    "censored": 0,
+    "on_accepted_path": 240,
+    "accepted_path_fraction": 0.8633,
+    "by_position": {
+     "0:script": {
+      "open": 88
+     },
+     "1:script": {
+      "open": 46,
+      "closed": 42
+     },
+     "2:script": {
+      "closed": 18,
+      "open": 26
+     },
+     "3:script": {
+      "open": 12,
+      "closed": 14
+     },
+     "4:script": {
+      "open": 8,
+      "closed": 4
+     },
+     "5:script": {
+      "open": 6,
+      "closed": 2
+     },
+     "6:script": {
+      "closed": 2,
+      "open": 4
+     },
+     "7:script": {
+      "open": 2,
+      "closed": 2
+     },
+     "8:script": {
+      "closed": 2
+     }
+    },
+    "shards": [
+     {
+      "file": "transitions/goals-0000.jsonl",
+      "kind": "goals",
+      "records": 198,
+      "sha256": "275e88c8286ad33a2e152c21ff9786098074b5bd6d8a8791b9d5378a23c0b1a0",
+      "cid": "cf0df0c19788dd6bbf6b3c6ad753d5ff0c199727c62b51c256caebd5a6e9b68f"
+     },
+     {
+      "file": "transitions/transitions-0000.jsonl",
+      "kind": "transitions",
+      "records": 278,
+      "sha256": "17f06eee83851a86eaf4d8399abb9725a8c97d35d5fd27fc0b8f1101ffb84428",
+      "cid": "b7c8655a73bacf10129e6d5ac55f59fafc9d7e3db71a98243f82d2dcd3b40be6"
+     }
+    ]
+   },
+   {
+    "round": 2,
+    "n_transitions": 14,
+    "n_goals": 10,
+    "censored": 0,
+    "on_accepted_path": 12,
+    "accepted_path_fraction": 0.8571,
+    "by_position": {
+     "0:script": {
+      "open": 5
+     },
+     "1:script": {
+      "error": 1,
+      "closed": 2,
+      "open": 2
+     },
+     "2:script": {
+      "open": 2
+     },
+     "3:script": {
+      "closed": 2
+     }
+    },
+    "shards": [
+     {
+      "file": "transitions/goals-0000.jsonl",
+      "kind": "goals",
+      "records": 10,
+      "sha256": "2ce2185c546361b7f47caf123a3a4a967894ff76e4ef6ef015ec4c07c2e7492d",
+      "cid": "799d4d4143e351c01c7bf83d20879c4d8318f7de5618f54e9300104b3e3df71c"
+     },
+     {
+      "file": "transitions/transitions-0000.jsonl",
+      "kind": "transitions",
+      "records": 14,
+      "sha256": "4e6ad29b1b7e7a34570019b305490ac528f8c2c231697d08890881e46b94e5ba",
+      "cid": "65d8751d7014c9d9930cfb174362cf4f8ca174be9813e4ea253fbb227a2075ec"
+     }
+    ]
+   },
+   {
+    "round": 3,
+    "n_transitions": 19,
+    "n_goals": 14,
+    "censored": 0,
+    "on_accepted_path": 8,
+    "accepted_path_fraction": 0.4211,
+    "by_position": {
+     "0:script": {
+      "open": 5
+     },
+     "1:script": {
+      "open": 4,
+      "error": 1
+     },
+     "2:script": {
+      "closed": 1,
+      "open": 3
+     },
+     "3:script": {
+      "open": 2,
+      "closed": 1
+     },
+     "4:script": {
+      "closed": 2
+     }
+    },
+    "shards": [
+     {
+      "file": "transitions/goals-0000.jsonl",
+      "kind": "goals",
+      "records": 14,
+      "sha256": "4234a62008937b904d26e2540ea4d7c243195225cff4f8cfd1c2b202b3d848c6",
+      "cid": "23ade1e723fbe328d115d45192bf2bbcdebed99902e780d4c90617779b60c841"
+     },
+     {
+      "file": "transitions/transitions-0000.jsonl",
+      "kind": "transitions",
+      "records": 19,
+      "sha256": "15dc1ab1aaa9bc6ad1884d86fad4c5c96c862642229427be6964828273c88fd7",
+      "cid": "cc41c3f61c0483004d6cbe1806ddcc19a315f2530f0f0d14549e226d0b8b3043"
+     }
+    ]
+   },
+   {
+    "round": 4,
+    "n_transitions": 6,
+    "n_goals": 3,
+    "censored": 0,
+    "on_accepted_path": 2,
+    "accepted_path_fraction": 0.3333,
+    "by_position": {
+     "0:script": {
+      "open": 3
+     },
+     "1:script": {
+      "closed": 2,
+      "error": 1
+     }
+    },
+    "shards": [
+     {
+      "file": "transitions/goals-0000.jsonl",
+      "kind": "goals",
+      "records": 3,
+      "sha256": "b117f4a9f7fa1800efb311090da2dc03d326a9d9b27d9b2b6ac850308732e266",
+      "cid": "a73344164b1cc4fc00900e7806fda06db0c80f5554e5a2932359353601e9fa6c"
+     },
+     {
+      "file": "transitions/transitions-0000.jsonl",
+      "kind": "transitions",
+      "records": 6,
+      "sha256": "037a3aa176369d5776ad7c1e8bc23fde8868333b6fa9a0dd7bc42c4325e4b102",
+      "cid": "185b445f4f3341e8c8ab1c7e168517a3cc3cde981ac262fcaa4cbe3862410e10"
+     }
+    ]
+   },
+   {
+    "round": 5,
+    "n_transitions": 5,
+    "n_goals": 4,
+    "censored": 0,
+    "on_accepted_path": 0,
+    "accepted_path_fraction": 0.0,
+    "by_position": {
+     "0:script": {
+      "open": 1
+     },
+     "1:script": {
+      "open": 1
+     },
+     "2:script": {
+      "open": 1
+     },
+     "3:script": {
+      "open": 1
+     },
+     "4:script": {
+      "closed": 1
+     }
+    },
+    "shards": [
+     {
+      "file": "transitions/goals-0000.jsonl",
+      "kind": "goals",
+      "records": 4,
+      "sha256": "440ecfecfa419b83d9cb64fee84413833756d290b526844e98f44e733ea39608",
+      "cid": "2c749668279e08629d6afef7dc9fe9d51ff27f8bdc24d441674676199cb70d74"
+     },
+     {
+      "file": "transitions/transitions-0000.jsonl",
+      "kind": "transitions",
+      "records": 5,
+      "sha256": "b56ae712c693af95fee75cb3ad64412ceb9fcf63be5e4d7f9937f0cd21271ecd",
+      "cid": "9bc98e5728aa46dea7f754d94b0fb803f53452a72a34b5b908b89a4c7039bd03"
+     }
+    ]
+   },
+   {
+    "round": 6,
+    "n_transitions": 0,
+    "n_goals": 0,
+    "censored": 0,
+    "on_accepted_path": 0,
+    "accepted_path_fraction": null,
+    "by_position": {},
+    "shards": []
+   },
+   {
+    "round": 7,
+    "n_transitions": 2,
+    "n_goals": 1,
+    "censored": 0,
+    "on_accepted_path": 2,
+    "accepted_path_fraction": 1.0,
+    "by_position": {
+     "0:script": {
+      "open": 1
+     },
+     "1:script": {
+      "closed": 1
+     }
+    },
+    "shards": [
+     {
+      "file": "transitions/goals-0000.jsonl",
+      "kind": "goals",
+      "records": 1,
+      "sha256": "b0789f4715e36bdf4b431fce596781537dac8293a8a8c7877b16cd4dd7d7d6ab",
+      "cid": "9044cb58d22755c9e09fb5db5f095b12b8ba3b91dbecb9f3f1c851260d62c167"
+     },
+     {
+      "file": "transitions/transitions-0000.jsonl",
+      "kind": "transitions",
+      "records": 2,
+      "sha256": "226b68dfa65603b5e75f226b57df83fa526b651432fd91004219b047abff4b1e",
+      "cid": "2954636f4ee30d094287bf9c9bf89dfe5c728354b5898131c44186b6756f0355"
+     }
+    ]
+   },
+   {
+    "round": 8,
+    "n_transitions": 7,
+    "n_goals": 6,
+    "censored": 0,
+    "on_accepted_path": 7,
+    "accepted_path_fraction": 1.0,
+    "by_position": {
+     "0:script": {
+      "open": 1
+     },
+     "1:script": {
+      "open": 1
+     },
+     "2:script": {
+      "open": 1
+     },
+     "3:script": {
+      "open": 1
+     },
+     "4:script": {
+      "open": 1
+     },
+     "5:script": {
+      "open": 1
+     },
+     "6:script": {
+      "closed": 1
+     }
+    },
+    "shards": [
+     {
+      "file": "transitions/goals-0000.jsonl",
+      "kind": "goals",
+      "records": 6,
+      "sha256": "e2cf31bf9a5d0af8198bb7982c266deaa4fec30bf47edb009eb463fd304eaa76",
+      "cid": "1376e6e519191fac838fc00415589f27d75bf0eb214ef226dc01a414945797aa"
+     },
+     {
+      "file": "transitions/transitions-0000.jsonl",
+      "kind": "transitions",
+      "records": 7,
+      "sha256": "40e5a54f0aa4a1c587db05cc5b6133275d2987f2860137d1318c0eaff12f4c04",
+      "cid": "fe16f9cefd4bcfc8cfdbcb7e5e6f24f02c89526f6a82968bb0ac24058787f836"
+     }
+    ]
+   },
+   {
+    "round": 13,
+    "n_transitions": 0,
+    "n_goals": 0,
+    "censored": 0,
+    "on_accepted_path": 0,
+    "accepted_path_fraction": null,
+    "by_position": {},
+    "shards": []
+   },
+   {
+    "round": 16,
+    "n_transitions": 7,
+    "n_goals": 6,
+    "censored": 0,
+    "on_accepted_path": 7,
+    "accepted_path_fraction": 1.0,
+    "by_position": {
+     "0:script": {
+      "open": 1
+     },
+     "1:script": {
+      "open": 1
+     },
+     "2:script": {
+      "open": 1
+     },
+     "3:script": {
+      "open": 1
+     },
+     "4:script": {
+      "open": 1
+     },
+     "5:script": {
+      "open": 1
+     },
+     "6:script": {
+      "closed": 1
+     }
+    },
+    "shards": [
+     {
+      "file": "transitions/goals-0000.jsonl",
+      "kind": "goals",
+      "records": 6,
+      "sha256": "a5207487be55a43b3a1b42e9a639e9d177c65df9be0427b5f73c1a1155f2fca4",
+      "cid": "847d70edf888502d83e3c552969fc6a697f72ba87e182cd62f32df1167573256"
+     },
+     {
+      "file": "transitions/transitions-0000.jsonl",
+      "kind": "transitions",
+      "records": 7,
+      "sha256": "6b91489154902f38474a3b4c8bebb7607e6ca860ad38b89a4a0b550e97adaeff",
+      "cid": "bac74f1ff6fadacf7ddf9e417c4265d492f92c7ced9c39978a0aec0348f5ea1d"
+     }
+    ]
+   }
+  ]
+ },
+ "attempts_sha256": "72e169e9260fc0b0594cde5e0aae410631955aeb1b805fe908b9da77f5558c43",
+ "elapsed_s": 6811.9,
+ "attempts_cid": "ac2ace89b0cfe03e518c9d0d78aceffdbc13bed76adc41e69c01461cf8fefe02"
+}

@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "title": "tier B pilot sealed; ladder-S + W0 v2 passed",
+  "summary": "2026-09-12: tier B pilot-B2 sealed (manifest eccfd342): P_B(1)=0.74 P_B(4)=0.86 P_B(16)=0.92 on the 50-theorem set (tier A 0.32), tier-A-failed 0.65/0.79/0.88, spend $25.30 all-in incl. $3.51 voided, 0 refusals, 2 self-proofs (hidden name recalled). ladder-S exits 1+3 PASS; W0 v2 PASSED (MRR 0.733 vs 0.689). Open: L-8 cost head; Q-25 non-vacuous form to build; tier B test200 unfunded; OpenAI NS intake pinned, not started.",
+  "artifacts": [
+    {
+      "name": "OPEN.yml",
+      "cid": "4d907d9ec9f70edf748087985253596b77ffad44df852275ecade3a0e9b236bf"
+    },
+    {
+      "name": "ledger.jsonl",
+      "cid": "a9865d31f4ee1b8c943dcd202d60102432bd9d04a6fdbc7e7f6e101ca06452e6"
+    },
+    {
+      "name": "MANIFEST.yml",
+      "cid": "f4965c1d90133d0a5cc11cbec0e61bf5d2bb69d8f63aeaad08c2255e5946be2b"
+    },
+    {
+      "name": "OPEN.yml",
+      "cid": "063633aee6b4806b27c425ec351ab26f84472a67e01ee6e848e99faa4cd4d6b8"
+    },
+    {
+      "name": "exit1-tierB.json",
+      "cid": "8367a4c57d6faaf8fb40933114565f23055ad71f1f5e9bc7a7cf28a2ff81b593"
+    },
+    {
+      "name": "exit1-ladderS.json",
+      "cid": "b0781debf1bbeaad46f873c53612ce4459158d696f78c6413c87927ef994823f"
+    },
+    {
+      "name": "manifest-pilot-B2.json",
+      "cid": "eccfd342f339be169b47b2afdfdce70f9b47690eea26791e3b10c5abba86066b"
+    }
+  ],
+  "meta": {
+    "catbus_packet": "true",
+    "lemma_head": "1e434f8",
+    "quod_head": "9efd7d2"
+  },
+  "cdom": null
+}

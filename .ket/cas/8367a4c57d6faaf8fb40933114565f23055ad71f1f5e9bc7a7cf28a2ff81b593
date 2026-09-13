@@ -1,0 +1,72 @@
+{
+ "tier": "B",
+ "prover": "tier-B",
+ "model": "claude-opus-5",
+ "model_created_at": "2026-07-24 00:00:00+00:00",
+ "effort": "high",
+ "exit_condition": "1 (P frozen from the pilot; the 200-theorem test is not funded)",
+ "pilot_run": "pilot-B2",
+ "set": {
+  "controls": "attempts/controls-1337.json",
+  "which": "pilot",
+  "n": 50,
+  "sha256": "0663ba70662a428bb4a3e35eaea9ac594fc0bd2e480ff1d1405e8927d84388c1",
+  "cid": "32cbdc046ad586d68e3a04b97a004ccff143fae8174942c255719cf3d1fe8819"
+ },
+ "n": 50,
+ "P_frozen": {
+  "P_B(1)": {
+   "all": 0.74,
+   "tier_a_failed": 0.6471
+  },
+  "P_B(4)": {
+   "all": 0.86,
+   "tier_a_failed": 0.7941
+  },
+  "P_B(16)": {
+   "all": 0.92,
+   "tier_a_failed": 0.8824
+  }
+ },
+ "P_A_same_set": 0.32,
+ "accepted_by_round": {
+  "1": 37,
+  "2": 4,
+  "3": 2,
+  "7": 1,
+  "8": 1,
+  "16": 1
+ },
+ "spend_cents_total": 2529.7,
+ "spend_cents_voided": 351.38,
+ "voided_batches": [
+  "msgbatch_011SA8UJ6nY3zD4WVUNa1fx5",
+  "msgbatch_01ATdL5yXMvL3bzNHN1nDZtj"
+ ],
+ "usage": {
+  "input": 196635,
+  "output": 1703334,
+  "cache_write": 0,
+  "cache_read": 0
+ },
+ "prompt_cache": "none (static prefix below the cacheable minimum)",
+ "refusals": 0,
+ "selfproof_rejections": 2,
+ "selfproof_note": "both rejections were the model naming the hidden theorem's own Mathlib constant (statement recognized, label recalled): the leakage ATTEMPTS.md warns of, caught by the gate",
+ "transitions_total_deduped": 199,
+ "round1_dedup": "attempts/pilot-B2/r1-dedup/NOTE.json",
+ "manifest_cid": "eccfd342f339be169b47b2afdfdce70f9b47690eea26791e3b10c5abba86066b",
+ "pre_manifest_cid": "3cfcf4194191a3270245766913b2f08fd47996fb7b429f173fad0ea2971d93eb",
+ "prover_config_cid": "7d0173f9632853031943c36f9c998e4098d1c98c0f8561b5147e0c5cf9c0d820",
+ "unproven": [
+  "Action.Functor.mapActionPreservesColimitsOfShapeOfPreserves",
+  "Matrix.IsHermitian.mulVec_eigenvectorBasis",
+  "WithCStarModule.norm_equiv_le_norm_prod",
+  "IntermediateField.normal_iff_forall_map_eq"
+ ],
+ "caveats": [
+  "rounds 9-15 mostly returned no script: the residue exhausts 16k output tokens in thinking",
+  "P_B is prover-relative and pilot-only; no test set was run (unfunded)",
+  "a proof that cites memorized Mathlib lemmas is valid; only the theorem's own lock is excluded"
+ ]
+}
