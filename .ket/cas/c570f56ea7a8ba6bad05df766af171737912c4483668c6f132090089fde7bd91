@@ -1,0 +1,145 @@
+{
+ "intake": "openai-ns",
+ "pin": {
+  "lean_toolchain": "leanprover/lean4:v4.34.0-rc2",
+  "mathlib": "85e3a25e006c35636f0e53b0e9296caca2685bc0",
+  "comparator": "19e111e2141cf333c7daff0f64c5f24acc91dd2e",
+  "lean4export": "cacf989b",
+  "statement_file": {
+   "path": "ComparatorChallenges/NavierStokes.lean",
+   "bytes": 13031,
+   "git_blob": "673fb19e26e60818d446363afd953f618719f99b",
+   "sha256": "0cd193b8d5cbd0266e6e2f72e68dd5abcdcf2430ebd435dd9289737e9aa7da61",
+   "blake3": "56996609b8f8c26e3a381afa2c5b9577ffe4d7623f485a7642f36ac65de0b3aa"
+  },
+  "challenge_spec": {
+   "path": "ComparatorChallenges/NavierStokes.json",
+   "bytes": 375,
+   "sha256": "7610ecead7b390d80ff7f4229a3ff8f18d630e046f7ad1de4f92c7e8e76845b8",
+   "blake3": "0310c863fda0165379d47ea44f7e65fc9a257931438a0ecd70a7e6d879a8aa2a"
+  },
+  "commit": "f9e8bc5b38b6e212696e8a30e3e91517af887bbd",
+  "repo": "https://github.com/openai/NavierStokesAndEuler"
+ },
+ "pin_verified": "verified f9e8bc5b38b6e212696e8a30e3e91517af887bbd at 2026-09-13T00:18:06-0400",
+ "build": {
+  "wall": "12 min (04:25:19Z-04:37:37Z, 9,372 jobs incl. cached Mathlib)",
+  "log_cid": "1f08ffd2e2451b2f508efe0a6921c3b0f6193df8702b78510fa70c60d0684908"
+ },
+ "checker": {
+  "ran": true,
+  "exit": 0,
+  "finished": "2026-09-13T06:26:09Z",
+  "modules": 610,
+  "checker": "lean4checker master 91a7f0e8e9dffe927089f5a6edcfeeb8a0e07709 (toolchain v4.29.0-rc8) on lean-toolchain v4.34.0-rc2 with a one-line API patch (evidence/lean4checker-v4.34-patch.diff)",
+  "checker_sha256": "f2fb235ab1583bd6286c1bfeb9c7d85eee30f4c7fdbea39e52243b69b53c9c63",
+  "workers": 2,
+  "log_cid": "df5213bd2e505fee803832bc60a69dcbc622e9ac62b764904fc5ae3bf0303989",
+  "log_sha256": "a712aeb46a2b690f7058e135aac4fc0f8898c3a74a2b39dea3416389b99a46e6"
+ },
+ "results": {
+  "OPENAI-NS-R3": {
+   "status": "proven",
+   "proof_verdict": "accepted",
+   "lock": "3608c95f250ae65119e583dc9e166a29bc3c5ba3e00d1bff14f90eb935c11952",
+   "lock_equal": true,
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "grounded": true,
+   "fidelity_equal": true
+  },
+  "OPENAI-NS-PERIODIC": {
+   "status": "proven",
+   "proof_verdict": "accepted",
+   "lock": "486545e22b09f274b47a8ee14e24a7ba3422be7c0888199430b2f931b84a03d0",
+   "lock_equal": true,
+   "axioms": [
+    "Classical.choice",
+    "Quot.sound",
+    "propext"
+   ],
+   "grounded": true,
+   "fidelity_equal": true
+  }
+ },
+ "evidence_cids": {
+  "PIN.json": {
+   "cid": "6cdd4031125729ca6fe9d9fd9f8bdc0acf67cce1fd7590521fc588f36b1cc658",
+   "sha256": "3b60ed1b6ec44eb286dd27c26be42aab6a7940bf8ddfcd79db8151c835b0f91e"
+  },
+  "PIN-verified.txt": {
+   "cid": "6c028424adad3badee79d3ce90eabab8dc8ff44b1c3abc932e49288b38c7db06",
+   "sha256": "78420ee50b4701a634d80a9707262eba901318d70752692e8a3e00f01991498f"
+  },
+  "evidence/lock-challenge_R3.json": {
+   "cid": "d9289d07a04b99e87feca34c6a1f20f5d825c9e3c13f2041edbb052e5be31d31",
+   "sha256": "26aade46f9babe7a474155b99c62f181db6744b4d11058eb1dd6927cd1b28666"
+  },
+  "evidence/lock-challenge_periodic.json": {
+   "cid": "a844a74e17b62d4488ab9f2caffdaead51af9e7741701c7e404e491d1cc90349",
+   "sha256": "61caa47b614c8858b5fce52cdde75704f3b0835a2185bed5fef02bbd3f0555a3"
+  },
+  "evidence/lock-solution_R3.json": {
+   "cid": "924db9ad2903946e4e0c53dc23772edd420a40a7b9954d2d71a199ec735d94da",
+   "sha256": "ea43349362824fcd104ca25e2933be97bd2fc01250deab424d4deec232c32450"
+  },
+  "evidence/lock-solution_periodic.json": {
+   "cid": "3928fc3e0ff9f9d8dc572edfd39f8363d182b9c55d9aeacadc57fd033de851c0",
+   "sha256": "68bdd9d6a64840b21af0916084c9ef032aeb0ddab409ad1a538908981d5d4af1"
+  },
+  "evidence/axioms-solution.json": {
+   "cid": "3d49ef4ac30cfc9f98f57b2125964586380c74d19c2059e806ed1090a15c2c91",
+   "sha256": "0ae79b6458250b0e22485f824c0826a48cc4024dd53fc310830eb231866c5a4c"
+  },
+  "evidence/closure-challenge_R3.json": {
+   "cid": "f286aad96d61faad0675df5985600d42b59bea2303994e8c06efcc92d0d37224",
+   "sha256": "8319010839c5aba2b0d229f231e391ed76b8ffbffe6b10f1cb0435882dcf6e17"
+  },
+  "evidence/closure-challenge_periodic.json": {
+   "cid": "4bd01907f66da8965427ab1a6eeff183bb471a6cb7915e23f2a0a832e4ab836b",
+   "sha256": "e97d46b22f3137a4ed13c5f8e699892c57f79676792a78db6a195b65daf6f03a"
+  },
+  "evidence/fidelity.json": {
+   "cid": "1a6117867656e460e02b26c464e34f12beb8f7a6ab457487d9766f2947f00a21",
+   "sha256": "c6dc14cd0835eda1e63f3dc98383170f2b65df9ad15a955cb8f4300b6add9b95"
+  },
+  "evidence/port-diff.txt": {
+   "cid": "6e3f418c5f47f8ce5cf1ec2d19705c2dba0ba53cf683e197d93e5f6a1112321b",
+   "sha256": "3cc664a94340d936cbdb6b887f11c3875415969e42fe0874075a9a04530a9d4a"
+  },
+  "evidence/statement-diff.txt": {
+   "cid": "570a6eca4c063abdfe3cf99e2740b97919fd0c5e5b5f188f862e4b561916e1d8",
+   "sha256": "acd984cea3262ce05432b430b48ae05abce23607f2eec897254603f5b65d511c"
+  },
+  "evidence/upstream-8bf45ed7-vs-2ff75e1a.diff": {
+   "cid": "4b03db5c4e3ce3f120a65d7d03ab3f4ec5de30430f45aaec147ef830e1d4e536",
+   "sha256": "b753d01b06fa2efab46a3779e1b8be252b517ba1ccc6fc1c8aa5c4617f4e307a"
+  },
+  "evidence/lean4checker-v4.34-patch.diff": {
+   "cid": "64296deb8042f0ab2144d41f44766473281633c38033d639c54001bb89aeb066",
+   "sha256": "7c84243e2d96634f0b23d4ffe7f87f02d1092e1f7e8a9c63611e79e65b78e929"
+  },
+  "evidence/closure-modules.txt": {
+   "cid": "96a67cb31baeef4482cb27028cb992713cbad75a996c7cd75ee50223e240b3b4",
+   "sha256": "e48d59875815eef61a1af162299c19f94b1e4f836595efa6c0081c4469d33ce3"
+  },
+  "repo/Intake/UpstreamNavierStokes.lean": {
+   "cid": "feea12828e1f6830ab999fc5de0e6547ee22cdedffd5f8f4fccf34945a59803d",
+   "sha256": "9dc64cfbccb246d9d0084c405a48268dc17f6fe105ae79eeaf093251a7620e89"
+  },
+  "build.log": {
+   "cid": "1f08ffd2e2451b2f508efe0a6921c3b0f6193df8702b78510fa70c60d0684908",
+   "sha256": "7760da0fceecd8be61f5ba4a332032095739095318eed0ef57ad74cc99b018fe"
+  }
+ },
+ "runner": {
+  "lock.py": "44701e8ce72cbf8b0876a0025c10fd3f1c5e8039d033ec2bdf93092fd6f88ebc",
+  "axiom_gate.py": "aed923bbb7ce405f9a61b9bb58bf2ae4c7df9f7810d21329126cb64dc50992b4",
+  "closure.py": "644e45922f305aeaa7d5b6b3b5e4e00613365dda5a499c8cc68e29c15ed2bcf6",
+  "write_claims.py": "458fcfdb77783e8472cca41190f03b021a81874dbc5a120fd42a128c83dbb33a"
+ },
+ "generated": "2026-09-13T02:28:40-0400"
+}

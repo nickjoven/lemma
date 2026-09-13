@@ -1,0 +1,60 @@
+id: OPENAI-NS-R3
+gloss: 'Clay alternative C as stated in OpenAI''s challenge file at commit f9e8bc5b38b6:
+  the demonstrandum is `NavierStokes.Comparator.navier_stokes_breakdown_R3` in module
+  ComparatorChallenges.NavierStokes (a `sorry` placeholder); the offered proof is
+  the same-named theorem in module NavierStokes.ComparatorSolution. Computed at the
+  claim''s own pin (leanprover/lean4:v4.34.0-rc2, mathlib 85e3a25e006c). Nothing here
+  is a statement about the authors.'
+demonstrandum: ComparatorChallenges.NavierStokes:NavierStokes.Comparator.navier_stokes_breakdown_R3
+lock: 3608c95f250ae65119e583dc9e166a29bc3c5ba3e00d1bff14f90eb935c11952
+offered: NavierStokes.ComparatorSolution:NavierStokes.Comparator.navier_stokes_breakdown_R3
+offered_lock: 3608c95f250ae65119e583dc9e166a29bc3c5ba3e00d1bff14f90eb935c11952
+proof_verdict: accepted
+refutation: null
+refutation_verdict: null
+status: proven
+descriptors:
+  hypotheses:
+  - name: hnu
+    type: nu > 0
+  custom_constants:
+  - NavierStokes.Comparator.InitialVelocityConditionDecay
+  - NavierStokes.Comparator.ForceConditionDecay
+  - NavierStokes.Comparator.NavierStokesExistenceAndSmoothnessRn
+  grounded: true
+  closure_custom:
+  - NavierStokes.Comparator.navier_stokes_breakdown_R3
+  - NavierStokes.Comparator.InitialVelocityConditionDecay
+  - NavierStokes.Comparator.ForceConditionDecay
+  - NavierStokes.Comparator.NavierStokesExistenceAndSmoothnessRn
+  closure_axioms: []
+  closure_opaque: []
+  reduces_to_True: false
+  registry_match: null
+  statement_fidelity:
+    upstream: google-deepmind/formal-conjectures FormalConjectures/Millenium/NavierStokes.lean
+      @ 8bf45ed7 (the commit OpenAI's file cites; blob 6fd45b55...), ported into this
+      pin with import/attribute/notation/namespace changes only (evidence/port-diff.txt)
+    canonical_forms_equal_after_namespace_normalization: true
+    compared:
+    - navier_stokes_breakdown_R3
+    - InitialVelocityConditionDecay.mk
+    - ForceConditionDecay.mk
+    - NavierStokesExistenceAndSmoothnessRn.mk
+    - InitialVelocityConditionDecay
+    - ForceConditionDecay
+    - NavierStokesExistenceAndSmoothnessRn
+    note: 'a descriptor, never a status: the upstream file lives at a different pin
+      (v4.33.1), so this is a same-pin port, not a cross-pin lock'
+  checker_closure_modules: 610
+controls: []
+reasons: []
+evidence:
+  pin_cid: 6cdd4031125729ca6fe9d9fd9f8bdc0acf67cce1fd7590521fc588f36b1cc658
+  lock_cid: d9289d07a04b99e87feca34c6a1f20f5d825c9e3c13f2041edbb052e5be31d31
+  offered_lock_cid: 924db9ad2903946e4e0c53dc23772edd420a40a7b9954d2d71a199ec735d94da
+  closure_cid: f286aad96d61faad0675df5985600d42b59bea2303994e8c06efcc92d0d37224
+  axioms_cid: 3d49ef4ac30cfc9f98f57b2125964586380c74d19c2059e806ed1090a15c2c91
+  fidelity_cid: 1a6117867656e460e02b26c464e34f12beb8f7a6ab457487d9766f2947f00a21
+  checker_cid: df5213bd2e505fee803832bc60a69dcbc622e9ac62b764904fc5ae3bf0303989
+  checker_patch_cid: 64296deb8042f0ab2144d41f44766473281633c38033d639c54001bb89aeb066

@@ -1,0 +1,60 @@
+id: OPENAI-NS-PERIODIC
+gloss: 'Clay alternative D as stated in OpenAI''s challenge file at commit f9e8bc5b38b6:
+  the demonstrandum is `NavierStokes.Comparator.navier_stokes_breakdown_periodic`
+  in module ComparatorChallenges.NavierStokes (a `sorry` placeholder); the offered
+  proof is the same-named theorem in module NavierStokes.ComparatorSolution. Computed
+  at the claim''s own pin (leanprover/lean4:v4.34.0-rc2, mathlib 85e3a25e006c). Nothing
+  here is a statement about the authors.'
+demonstrandum: ComparatorChallenges.NavierStokes:NavierStokes.Comparator.navier_stokes_breakdown_periodic
+lock: 486545e22b09f274b47a8ee14e24a7ba3422be7c0888199430b2f931b84a03d0
+offered: NavierStokes.ComparatorSolution:NavierStokes.Comparator.navier_stokes_breakdown_periodic
+offered_lock: 486545e22b09f274b47a8ee14e24a7ba3422be7c0888199430b2f931b84a03d0
+proof_verdict: accepted
+refutation: null
+refutation_verdict: null
+status: proven
+descriptors:
+  hypotheses:
+  - name: hnu
+    type: nu > 0
+  custom_constants:
+  - NavierStokes.Comparator.InitialVelocityConditionPeriodic
+  - NavierStokes.Comparator.ForceConditionPeriodic
+  - NavierStokes.Comparator.NavierStokesExistenceAndSmoothnessPeriodic
+  grounded: true
+  closure_custom:
+  - NavierStokes.Comparator.navier_stokes_breakdown_periodic
+  - NavierStokes.Comparator.InitialVelocityConditionPeriodic
+  - NavierStokes.Comparator.ForceConditionPeriodic
+  - NavierStokes.Comparator.NavierStokesExistenceAndSmoothnessPeriodic
+  closure_axioms: []
+  closure_opaque: []
+  reduces_to_True: false
+  registry_match: null
+  statement_fidelity:
+    upstream: google-deepmind/formal-conjectures FormalConjectures/Millenium/NavierStokes.lean
+      @ 8bf45ed7 (the commit OpenAI's file cites; blob 6fd45b55...), ported into this
+      pin with import/attribute/notation/namespace changes only (evidence/port-diff.txt)
+    canonical_forms_equal_after_namespace_normalization: true
+    compared:
+    - navier_stokes_breakdown_periodic
+    - InitialVelocityConditionPeriodic.mk
+    - ForceConditionPeriodic.mk
+    - NavierStokesExistenceAndSmoothnessPeriodic.mk
+    - InitialVelocityConditionPeriodic
+    - ForceConditionPeriodic
+    - NavierStokesExistenceAndSmoothnessPeriodic
+    note: 'a descriptor, never a status: the upstream file lives at a different pin
+      (v4.33.1), so this is a same-pin port, not a cross-pin lock'
+  checker_closure_modules: 610
+controls: []
+reasons: []
+evidence:
+  pin_cid: 6cdd4031125729ca6fe9d9fd9f8bdc0acf67cce1fd7590521fc588f36b1cc658
+  lock_cid: a844a74e17b62d4488ab9f2caffdaead51af9e7741701c7e404e491d1cc90349
+  offered_lock_cid: 3928fc3e0ff9f9d8dc572edfd39f8363d182b9c55d9aeacadc57fd033de851c0
+  closure_cid: 4bd01907f66da8965427ab1a6eeff183bb471a6cb7915e23f2a0a832e4ab836b
+  axioms_cid: 3d49ef4ac30cfc9f98f57b2125964586380c74d19c2059e806ed1090a15c2c91
+  fidelity_cid: 1a6117867656e460e02b26c464e34f12beb8f7a6ab457487d9766f2947f00a21
+  checker_cid: df5213bd2e505fee803832bc60a69dcbc622e9ac62b764904fc5ae3bf0303989
+  checker_patch_cid: 64296deb8042f0ab2144d41f44766473281633c38033d639c54001bb89aeb066
