@@ -1,0 +1,22 @@
+{
+ "tier": "B",
+ "prover": "tier-B",
+ "exit_condition": 3,
+ "pilot_neg": {
+  "run": "pilot-B-neg",
+  "n": 50,
+  "rounds_run": 1,
+  "halted": "before round 2: projected 2138c > cap 1500c",
+  "accepted": 0,
+  "by_outcome": {
+   "no_proposal": 40,
+   "no_proof_found": 10
+  },
+  "spend_cents": 972.0,
+  "refusals": 0,
+  "transitions": 31,
+  "manifest_cid": "78bf9c3c2a731641286db46f36f0c7812fe3d7565a5954d48fe0cf307220058b"
+ },
+ "pass": true,
+ "note": "not-T for every pilot theorem, one round (cap): 10 scripts proposed, none closed the negated goal; any gated acceptance would have halted the run. 40 responses carried no script (the model reasoned that the negation is false or exhausted its tokens)."
+}

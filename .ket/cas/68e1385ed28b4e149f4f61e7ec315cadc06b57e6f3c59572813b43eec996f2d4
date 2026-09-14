@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "title": "tier B controls complete; NS intake proven; compute pair shipped",
+  "summary": "2026-09-14: tier B test200-B sealed (43d5bcec): 160/200 after 3 rounds, P_B(1) 0.685 < frozen 0.74 -> exit 1 FAILS at level 1 (same pilot/test pattern as tier A); not-T control pilot-B-neg 0/50 (78bf9c3c) -> exit 3 PASS; tier B all-in $68.29. OpenAI NS intake: both claims PROVEN (RESULTS c570f56e). homeserv worker/controller roles (bef5a7d). LOCAL.md = quod PR #4. Open for Nick: partner box pairing, PR #4 review + local model admission, vocab nominations, whether the intake ships as its own PR.",
+  "artifacts": [
+    {
+      "name": "OPEN.yml",
+      "cid": "4d907d9ec9f70edf748087985253596b77ffad44df852275ecade3a0e9b236bf"
+    },
+    {
+      "name": "MANIFEST.yml",
+      "cid": "f4965c1d90133d0a5cc11cbec0e61bf5d2bb69d8f63aeaad08c2255e5946be2b"
+    },
+    {
+      "name": "OPEN.yml",
+      "cid": "063633aee6b4806b27c425ec351ab26f84472a67e01ee6e848e99faa4cd4d6b8"
+    },
+    {
+      "name": "exit1-tierB.json",
+      "cid": "7af96df89366de1d507c75c2d6349bb57353ae9d5a6f62a2ef6c999d5fb0a0ed"
+    },
+    {
+      "name": "exit3-tierB.json",
+      "cid": "a97655f6b12d7314858a216a142a4cb3accada04eb9c301c8b7c2e53b6c61eaf"
+    },
+    {
+      "name": "RESULTS.json",
+      "cid": "c570f56ea7a8ba6bad05df766af171737912c4483668c6f132090089fde7bd91"
+    }
+  ],
+  "meta": {
+    "catbus_packet": "true",
+    "lemma_head": "3e85318",
+    "quod_head": "bfa6492"
+  },
+  "cdom": null
+}
