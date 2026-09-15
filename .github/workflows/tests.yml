@@ -30,6 +30,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ket-src
-      - run: cargo build --release -p ket --manifest-path ket-src/Cargo.toml
+      - run: cargo build --release -p ket-cli --bin ket --manifest-path ket-src/Cargo.toml
       - name: Test
         run: PATH="$PWD/ket-src/target/release:$PATH" .venv/bin/python -m pytest -q
