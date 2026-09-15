@@ -20,5 +20,16 @@ jobs:
           uv venv .venv
           uv pip install --python .venv/bin/python "torch==2.9.0" --index-url https://download.pytorch.org/whl/cpu
           uv pip install --python .venv/bin/python -e . pytest
+      - name: Build ket (the ledger's evidence store; put/get need no Dolt)
+        uses: actions/checkout@v4
+        with:
+          repository: nickjoven/ket
+          ref: f16834a6257a7f50cfb5d1700fb4adcc78c0d36b
+          path: ket-src
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ket-src
+      - run: cargo build --release -p ket --manifest-path ket-src/Cargo.toml
       - name: Test
-        run: .venv/bin/python -m pytest -q
+        run: PATH="$PWD/ket-src/target/release:$PATH" .venv/bin/python -m pytest -q
