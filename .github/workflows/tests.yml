@@ -1,0 +1,24 @@
+name: tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+      - name: Install (CPU torch; the lockfile pins CUDA wheels for the training box)
+        run: |
+          uv venv .venv
+          uv pip install --python .venv/bin/python "torch==2.9.0" --index-url https://download.pytorch.org/whl/cpu
+          uv pip install --python .venv/bin/python -e . pytest
+      - name: Test
+        run: .venv/bin/python -m pytest -q
