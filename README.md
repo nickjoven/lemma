@@ -2,6 +2,8 @@
 
 [N. Joven](https://github.com/nickjoven) — 2026 — [ORCID 0009-0008-0679-0812](https://orcid.org/0009-0008-0679-0812) — CC0 1.0
 
+[![tests](https://github.com/nickjoven/lemma/actions/workflows/tests.yml/badge.svg)](https://github.com/nickjoven/lemma/actions/workflows/tests.yml)
+
 Self-supervised encoders over a gate-verified Lean 4 / Mathlib corpus. The
 corpus and its labels come from [quod](https://github.com/nickjoven/quod);
 this repository never computes a label itself. Every metric here exists only
