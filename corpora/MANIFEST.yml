@@ -181,6 +181,18 @@ corpora:
   - file: goals/pilot-L-r8-goals-0000.jsonl
     cid: 897b2c67c4bca988eec4522ae45be25bbbcbf976b44901b3d7024fbc0cf26dea
     records: 76
+  - file: goals/pilot-L-neg-r1-goals-0000.jsonl
+    cid: a6aaec747508418ca086464da10790b067d0ab4116ae4ced0835f6e63d8c401f
+    records: 5
+  - file: goals/pilot-L-neg-r2-goals-0000.jsonl
+    cid: 9723760d6d016908d14dda19207438e6b0c376d484245ebb5ff74ebdb8ac8688
+    records: 27
+  - file: goals/pilot-L-neg-r3-goals-0000.jsonl
+    cid: d61a946476c11df031b7f1405505357b7e4ad2fd02454c927adf0dc12745e60a
+    records: 42
+  - file: goals/pilot-L-neg-r4-goals-0000.jsonl
+    cid: bb11e6da28dd119bc4e10036e3d85ff9dd73629607248a11b11f0b5a3f35d085
+    records: 57
   transitions:
   - file: transitions/theorems-A-t1-transitions-0000.jsonl
     cid: 5ecb295db054c4bac537c7cb84387b913cdc7947e057389481d609c94b8fa087
@@ -269,6 +281,18 @@ corpora:
   - file: transitions/pilot-L-r8-transitions-0000.jsonl
     cid: aeec40b85e8c0d9f47810f9ba8233dc9080316a270c1fa17dd92b127847bbfe6
     records: 108
+  - file: transitions/pilot-L-neg-r1-transitions-0000.jsonl
+    cid: 4b5fb06d558429b9c9b5bcf3825495b6278789211b1fc2febdd6acee024710e2
+    records: 5
+  - file: transitions/pilot-L-neg-r2-transitions-0000.jsonl
+    cid: 3c1f6fefa758bbca408b3abbfbf4b72eccf78b0c6cbfff09c413fae6b460e47a
+    records: 27
+  - file: transitions/pilot-L-neg-r3-transitions-0000.jsonl
+    cid: b0cd04c42c53b8a4008e4af6408202d7c36894b16cafeb13433ae4ccdd6ed1de
+    records: 42
+  - file: transitions/pilot-L-neg-r4-transitions-0000.jsonl
+    cid: b5054b23c771fd597e3d1549d2c6ba981898efd91532ac601aabb87b44e32bde
+    records: 57
 sources:
   mutants:
     run_id: mutants-20260911
@@ -308,21 +332,19 @@ sources:
     n_transitions: 199
     round1_dedup: r1-dedup/NOTE.json
   transitions_tier_l_goedel_v2_8b:
-    run_id: pilot-L
+    run_id: pilot-L-neg
     prover: tier-L-goedel-v2-8b
-    manifest_cid: afb2bb21d8b0c888042bcf61708671898bad658d85caa878acf6514ea06bd6a6
-    prover_config_cid: 5081fdc88987e06be14128d9ce66845087448111f31ae757ba42b41c2d1d2cfd
+    manifest_cid: fc6618db04e886a51b3be3b03d0e417ce359469078b2d1bc59646a44704c3616
+    prover_config_cid: 60343a84c7d3098175ad54ba782e38cec0f74142ac37ed6be20b9c09a4ceb99f
     pins:
       lean: v4.28.0
       mathlib: 8f9d9cff6bd728b17a24e163c9402775d9e6a365
       jin: f9d5c8d39bece41ceedf6346ef50ad1fb393260e
       lean4checker: 66e11cea12f5ba215d76b15b7f8495141bf52c6c
     regate_of: null
-    n_transitions: 753
-    rounds: 8
-    n_goals: 536
+    n_transitions: 131
+    rounds: 4
+    n_goals: 131
     censored: 0
     model: goedel-prover-v2-8b-q4km
-    note: 'quod Q-28: 24 rows from 8 walker-accepted, build-rejected scripts carry
-      on_accepted_path=true (attempt_verdict null); Q-27: 45 step-0 deaths from the
-      binder template'
+    note: 'not-T control (statements negated): 0/50 accepted; quod exit3-tierL.json'
