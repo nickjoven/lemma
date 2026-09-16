@@ -30,7 +30,7 @@ from the metrics record named in its row, which lives in the tracked
 | run | stage | measures | number | gate | ledger status | metrics_cid | wall clock |
 |---|---|---|---|---|---|---|---|
 | `s2-mlm-20260909-141736` | S2 train | span-MLM masked accuracy | 0.9317 | — | completed | `a7f3354d` | 27.2 h |
-| `s2-eval-s2-mlm-20260909-141736` | S2 eval | same-lock retrieval MRR; masked acc margin over a unigram baseline | MRR 0.9921; +65.9 pts | MRR ≥ 0.95 | completed (pass) | `088bf529` | 25 s |
+| `s2-eval-s2-mlm-20260909-141736` | S2 eval | same-lock retrieval MRR; masked acc margin over a unigram baseline | MRR 0.9921 on a full-corpus sample, **not held-out** (L-9); +65.9 pts | MRR ≥ 0.95 | completed (pass) | `088bf529` | 25 s |
 | `s3-gloss-20260910-174141` | S3 v1 train | contrastive docstring ↔ statement | — | — | completed | `78ff7b26` | 7.6 h |
 | `s3-eval-s3-gloss-20260910-174141` | S3 v1 eval | same-module hard-drift AUC; retrieval MRR | AUC 0.767; MRR 0.398 | AUC ≥ 0.90 | **calibration_failed** | `ca34a4b7` | 6 s |
 | `s3-gloss-20260911-012141` | S3 v2 train | v1 + module-grouped hard negatives, early stopping | — | — | completed | `c2c05884` | 1.8 h |
@@ -130,13 +130,13 @@ uv run python -m lemma.verify_release <downloaded file>
 
 | run | checkpoint_cid | ledger status | citation limit |
 |---|---|---|---|
-| `s2-mlm-20260909-141736` | `b2a83ed2054546d4407d28227e44782f1f50ac4631fa51f15f82d0b624776796` | completed; eval pass | statement encoder; same-lock MRR 0.992 on held-out modules |
+| `s2-mlm-20260909-141736` | `b2a83ed2054546d4407d28227e44782f1f50ac4631fa51f15f82d0b624776796` | completed; eval pass | statement encoder; same-lock MRR 0.992 on a full-corpus sample, not held-out (L-9); the sealed eval's `code_git` predates its evaluator (L-10) |
 | `s3-gloss-20260910-174141` | `28338bdf987ad720959f2c075363203f15c62f5b0c4dcc9f937f009b6be45850` | completed; eval calibration_failed | gross prose/statement mismatch only (L-1) |
 | `s3-gloss-20260911-012141` | `176ef79d921bc0caca58f06ff36cb0ef79f9e80e38ec1538bc35ce64f88c3de5` | completed; eval calibration_failed | gross prose/statement mismatch only (L-1) |
 | `s4-verdict-20260911-152400` | `16a64f5b1272c584384ccb1a70b7b9e57613bc09384f8ecb0cabff705e041d97` | completed; eval calibration_failed | operator-conditional `elaborates` on this mutant distribution (L-6) |
 | `s5-equiv-20260911-125959` | `04cd648b14dedc89da84ac5976b3ce92f4ab775711d8e671622f6af6c3ada587` | completed; eval pass | known-Iff retrieval; proposals unreranked (L-5) |
 | `w0-world-20260912-012400` | `63f915b15447abd18b02920f04b0fa5cd7619362e2716d32dbd3a8e41f7e8358` | completed; eval calibration_failed | W0 v1: trained on terminal tier-A transitions, 93% on mutant goals (L-7) |
-| `w0-world-20260912-124023` | `56b3e715b33fcb894856705885c58dd03da3941b639718401a0b31254688605a` | completed; eval pass (retrieval) | W0 v2: next-state retrieval only; cost head uncalibrated on censored rows (L-8) |
+| `w0-world-20260912-124023` | online `0b378b61cc9dc138688c9e4dfc5798b9735c4a25945ce9a42324dca69f8c6737`; EMA target `56b3e715b33fcb894856705885c58dd03da3941b639718401a0b31254688605a` | completed; eval pass (retrieval) | W0 v2: next-state retrieval only; cost head uncalibrated on censored rows (L-8); the released online model is from step 2500 and the target from step 4000, not one pair (L-11) |
 
 The tokenizer is tracked at
 [`runs/tokenizer/lean-unigram-32k.json`](runs/tokenizer/lean-unigram-32k.json),
