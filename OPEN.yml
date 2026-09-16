@@ -196,3 +196,39 @@
     transition against the measured Lean cost (wall_ms is recorded on every
     row) as the plan requires. Gate for the cost head: censored recall
     >= 0.5 at precision >= 0.5, and log-cost MAE <= 0.6 on uncensored rows.
+- id: L-9
+  severity: high
+  status: fix-pending (evaluator now restricted to the test split with exact-text and untrained-encoder baselines; the sealed number is not rerun)
+  title: S2 same-lock MRR 0.992 was measured on a full-corpus sample, not on held-out modules
+  detail: >
+    evaluate_s2 sampled duplicate groups and distractors from every row, with
+    no split filter, while the README said "held-out modules". The recorded
+    number stands as full-corpus duplicate retrieval and its evidence is kept;
+    the README is qualified. A renewed held-out claim needs a new sealed run
+    of the corrected evaluator (github issue #5).
+  fix: seal a new s2-eval run on the test split; report the margin over the
+    exact-text baseline as the learned part.
+- id: L-10
+  severity: high
+  status: fix-pending (start_run now refuses a source tree that differs from code_git, or seals the exact changed bytes under LEMMA_DIRTY_SOURCE=snapshot)
+  title: sealed run s2-eval-s2-mlm-20260909-141736 records a code_git that does not contain its evaluator
+  detail: >
+    inputs.code_git = 804d8cca..., but src/lemma/evaluate_s2.py first appears
+    at 022fe90. git_head() recorded HEAD without checking the working tree.
+    The record is preserved as is; its provenance is incomplete and no commit
+    is guessed for it (github issue #8).
+  fix: none for the old record; every new record carries code_git_dirty and
+    source_snapshot_cid when the tree was not the commit.
+- id: L-11
+  severity: high
+  status: fix-pending (BestPair saves the online model and the EMA target together at each best step; a role-labelled checkpoint manifest is sealed; the released run is not rerun)
+  title: W0 v2 released the best-step online model with the final-step EMA target
+  detail: >
+    validate() scored candidates with the target at that step but saved only
+    the online model; the target was saved after training. For
+    w0-world-20260912-124023, best_step 2500 < steps 4000, so the released
+    pair is not the pair that was scored. The README release table listed
+    only the target CID and no roles (github issue #9).
+  fix: rerun W0 under a new run id with the corrected trainer before changing
+    the reported number; the evaluation of the existing pair stands as the
+    evaluation of that pair.

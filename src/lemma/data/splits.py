@@ -3,8 +3,10 @@
 Rules (in force for every stage):
   1. The unit of assignment is the top-level Mathlib module: everything under
      one `Mathlib.<Area>` prefix lands in one split.
-  2. No lock crosses a split: if two declarations share a lock (dedup pair),
-     the later one follows the earlier one's split.
+  2. No lock crosses a split: two declarations that share a lock (a dedup
+     pair) land in one split. Since rule 1 also holds, the modules they live
+     in must land in one split too, so the real unit of assignment is a
+     CONNECTED COMPONENT of modules joined by shared locks (lemma #6).
   3. A mutant inherits its parent theorem's split, always.
   4. Both sides of an Iff pair share a split (guaranteed by rule 1 when both
      live in one declaration; enforced explicitly for cross-decl pairs).
@@ -47,18 +49,66 @@ def split_of_area(module: str) -> str:
     return SPLITS[-1]
 
 
-def assign(rows: list[DeclarationRow]) -> dict[str, str]:
-    """name -> split, honoring the module rule then the lock rule."""
-    by_lock: dict[str, str] = {}
-    out: dict[str, str] = {}
+def _components(rows: list[DeclarationRow]) -> dict[str, str]:
+    """module -> component key, where a component is a maximal set of modules
+    joined (transitively) by shared locks. The key is the lexicographically
+    smallest module in the component, so it depends only on the SET of rows,
+    never on their order (lemma #6: the previous first-seen-lock rule let one
+    declaration leave its module's split and made the result order-dependent).
+    Union-find over module names."""
+    parent: dict[str, str] = {}
+
+    def find(m: str) -> str:
+        while parent[m] != m:
+            parent[m] = parent[parent[m]]
+            m = parent[m]
+        return m
+
+    def union(a: str, b: str) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            # keep the smaller name as root so the root IS the canonical key
+            if rb < ra:
+                ra, rb = rb, ra
+            parent[rb] = ra
+
+    modules_of_lock: dict[str, set[str]] = defaultdict(set)
     for row in rows:
-        if row.lock in by_lock:
-            out[row.name] = by_lock[row.lock]
-        else:
-            s = split_of_area(row.module)
-            out[row.name] = s
-            by_lock[row.lock] = s
-    return out
+        parent.setdefault(row.module, row.module)
+        modules_of_lock[row.lock].add(row.module)
+    for mods in modules_of_lock.values():
+        first = min(mods)
+        for m in mods:
+            union(first, m)
+    return {m: find(m) for m in parent}
+
+
+def assign(rows: list[DeclarationRow]) -> dict[str, str]:
+    """name -> split. Every module lands whole in one split (rule 1), and
+    every shared lock stays inside one split (rule 2), because the split is
+    chosen per connected component of modules joined by shared locks and a
+    module that shares no lock with another module is its own component, so
+    its split is exactly split_of_area(module) as before."""
+    comp = _components(rows)
+    return {row.name: split_of_area(comp[row.module]) for row in rows}
+
+
+def component_stats(rows: list[DeclarationRow]) -> dict:
+    """Disclosed with the manifest: how much the shared-lock joins coarsened
+    the module partition. A large component is a warning that the split may
+    be lumpy or that a family of duplicated statements spans many files."""
+    comp = _components(rows)
+    sizes: dict[str, int] = defaultdict(int)
+    for m, key in comp.items():
+        sizes[key] += 1
+    multi = {k: n for k, n in sizes.items() if n > 1}
+    return {
+        "modules": len(comp),
+        "components": len(sizes),
+        "multi_module_components": len(multi),
+        "modules_in_multi_module_components": sum(multi.values()),
+        "largest_component_modules": max(sizes.values()) if sizes else 0,
+    }
 
 
 def assign_mutants(mutants: list[MutantRow], decl_splits: dict[str, str]) -> dict[int, str]:
@@ -83,9 +133,10 @@ def manifest(rows: list[DeclarationRow]) -> dict:
     inter = len(deps["train"] & deps["test"])
     union = len(deps["train"] | deps["test"]) or 1
     return {
-        "rule": "module-area blake3, lock-follows-first, mutant-inherits-parent",
+        "rule": "module blake3 over connected components joined by shared locks, mutant-inherits-parent",
         "weights": dict(zip(SPLITS, WEIGHTS)),
         "counts": dict(counts),
+        "components": component_stats(rows),
         "train_test_dep_jaccard": round(inter / union, 4),
         "assignment": splits,
     }

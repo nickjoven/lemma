@@ -49,6 +49,25 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTCOMES = ["closed", "open", "error", "budget"]
 
 
+class BestPair:
+    """The online model and its EMA target are ONE artifact: the validation
+    score that selects a step was computed with that step's target, so the
+    target saved must be the one from the same step (lemma #9: the previous
+    code saved the online model at the best step and the target at the end)."""
+
+    def __init__(self, online_path: Path, target_path: Path):
+        self.online_path, self.target_path = online_path, target_path
+        self.best, self.best_step = -1.0, -1
+
+    def consider(self, score: float, step: int, model: nn.Module, target: nn.Module) -> bool:
+        if score <= self.best:
+            return False
+        self.best, self.best_step = score, step
+        save_file({k: v.detach().contiguous() for k, v in model.state_dict().items()}, str(self.online_path))
+        save_file({k: v.detach().contiguous() for k, v in target.state_dict().items()}, str(self.target_path))
+        return True
+
+
 class WorldModel(nn.Module):
     def __init__(self, enc: Encoder, tactics: list[str], d_tac: int = 64):
         super().__init__()
@@ -163,18 +182,15 @@ def train(args) -> int:
     bs, steps, val_every = cfg.get("batch_size", 64), cfg.get("steps", 4000), cfg.get("val_every", 250)
     temp = float(cfg.get("temperature", 0.07))
     ckpt_dir = REPO_ROOT / "runs" / "ckpts"; ckpt_dir.mkdir(parents=True, exist_ok=True)
-    best_path = ckpt_dir / f"{run_id}-best.safetensors"
-    best, best_step, losses = -1.0, -1, []
+    pair = BestPair(ckpt_dir / f"{run_id}-best.safetensors", ckpt_dir / f"{run_id}-best-target.safetensors")
+    losses = []
 
     def validate(step):
-        nonlocal best, best_step
         z_hat, _, _ = predict_states(model, tok, val_single, cfg["max_seq"], device)
         z_after = embed_texts(target, tok, [r["after"] for r in val_single], cfg["max_seq"], device)
         m = mrr(z_hat, z_after, np.arange(len(val_single)))
-        if m > best:
-            best, best_step = m, step
-            save_file({k: v.contiguous() for k, v in model.state_dict().items()}, str(best_path))
-        print(f"step {step}: val next-state MRR {m:.4f}{' (best, saved)' if best_step == step else ''}", flush=True)
+        saved = pair.consider(m, step, model, target)
+        print(f"step {step}: val next-state MRR {m:.4f}{' (best, online+target saved)' if saved else ''}", flush=True)
 
     model.train()
     for step in range(steps):
@@ -209,20 +225,29 @@ def train(args) -> int:
             l = np.mean(losses[-100:], axis=0)
             print(f"step {step}: loss {l[0]:.4f} (nce {l[1]:.4f} out {l[2]:.4f} cost {l[3]:.4f})", flush=True)
     validate(steps)
-    ckpt = ckpt_dir / f"{run_id}.safetensors"; best_path.replace(ckpt)
-    tgt_path = ckpt_dir / f"{run_id}-target.safetensors"
-    save_file({k: v.contiguous() for k, v in target.state_dict().items()}, str(tgt_path))
-    cid = ledger.ket_put(ckpt.read_bytes()); rec.checkpoint_cids.append(cid)
-    tcid = ledger.ket_put(tgt_path.read_bytes()); rec.checkpoint_cids.append(tcid)
+    # the released pair is exactly the pair that scored best_step: both files were written together
+    ckpt = ckpt_dir / f"{run_id}.safetensors"; pair.online_path.replace(ckpt)
+    tgt_path = ckpt_dir / f"{run_id}-target.safetensors"; pair.target_path.replace(tgt_path)
+    cid = ledger.ket_put(ckpt.read_bytes()); rec.checkpoint_cids.append(cid)        # [0] online
+    tcid = ledger.ket_put(tgt_path.read_bytes()); rec.checkpoint_cids.append(tcid)  # [1] EMA target
     gi = REPO_ROOT / ".gitignore"
     for c_ in (cid, tcid):
         line = f".ket/cas/{c_}"
         if line not in gi.read_text().splitlines():
             with open(gi, "a") as f: f.write(f"{line}\n")
-    (REPO_ROOT / "runs" / f"{run_id}-tactics.json").write_text(json.dumps(tactics))
+    tactics_path = REPO_ROOT / "runs" / f"{run_id}-tactics.json"
+    tactics_path.write_text(json.dumps(tactics))
+    # role-labelled manifest: a reader can tell which CID is which and what vocabulary the heads index
+    checkpoint_manifest = {"run_id": run_id, "best_step": pair.best_step, "steps": steps,
+                           "checkpoints": [{"role": "online", "cid": cid, "file": ckpt.name},
+                                           {"role": "ema_target", "cid": tcid, "file": tgt_path.name}],
+                           "tactics_cid": ledger.ket_put(tactics_path.read_bytes())}
+    manifest_cid = ledger.ket_put_json(checkpoint_manifest)
     ledger.finish_run(rec, metrics={"steps": steps, "final_loss": float(np.mean([l[0] for l in losses[-100:]])),
                                     "train_rows": len(train_rows), "train_single_step": len(train_single),
-                                    "val_mrr_best": round(best, 4), "best_step": best_step, "tactics": tactics},
+                                    "val_mrr_best": round(pair.best, 4), "best_step": pair.best_step, "tactics": tactics,
+                                    "checkpoint_manifest_cid": manifest_cid,
+                                    "checkpoint_roles": {"online": cid, "ema_target": tcid}},
                       started_monotonic=t0)
     print(f"run {run_id} sealed; metrics_cid {rec.metrics_cid}", flush=True)
     return 0

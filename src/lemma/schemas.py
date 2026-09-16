@@ -141,6 +141,8 @@ class RunInputs(BaseModel):
     config_cid: str
     init_checkpoint_cid: Optional[str] = None
     code_git: str
+    code_git_dirty: Optional[bool] = None       # True iff the source paths differed from code_git at start
+    source_snapshot_cid: Optional[str] = None   # {path: cid} manifest of the exact changed bytes (lemma #8)
     env_lock_cid: Optional[str] = None
     mathlib_pin: str
 
