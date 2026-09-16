@@ -157,6 +157,30 @@ corpora:
   - file: goals/pilot-B2-r16-goals-0000.jsonl
     cid: 847d70edf888502d83e3c552969fc6a697f72ba87e182cd62f32df1167573256
     records: 6
+  - file: goals/pilot-L-r1-goals-0000.jsonl
+    cid: 35eb11aa660279f1e59ca4a41edd0084e038aaab6f13ee7aa40896d323e8ee18
+    records: 37
+  - file: goals/pilot-L-r2-goals-0000.jsonl
+    cid: 8297dce0c9fdfff2874c9e9221c358e26883770e437dbdaaac5e0117a9450529
+    records: 63
+  - file: goals/pilot-L-r3-goals-0000.jsonl
+    cid: fe66177dddecbf94805ba736ca603f985a3c6b029b80f1694d25748d2b146ec7
+    records: 67
+  - file: goals/pilot-L-r4-goals-0000.jsonl
+    cid: c15319a94b21273f90df83099ec03c0e335d217fe2d5d687f20612f1b41a61b5
+    records: 69
+  - file: goals/pilot-L-r5-goals-0000.jsonl
+    cid: 44dc51ff0f5638b095617c0db792658d5a6cd6e00861eb298a3eb547810e779d
+    records: 78
+  - file: goals/pilot-L-r6-goals-0000.jsonl
+    cid: 1da7a395d11130d15d22839120eabbb2ab1086794f8575e66087ec5d9cde77fe
+    records: 74
+  - file: goals/pilot-L-r7-goals-0000.jsonl
+    cid: 8d2ecd36f0a5bc45654f4d54851ad77b334dfab02b94b99ab69abe19bd22fc96
+    records: 72
+  - file: goals/pilot-L-r8-goals-0000.jsonl
+    cid: 897b2c67c4bca988eec4522ae45be25bbbcbf976b44901b3d7024fbc0cf26dea
+    records: 76
   transitions:
   - file: transitions/theorems-A-t1-transitions-0000.jsonl
     cid: 5ecb295db054c4bac537c7cb84387b913cdc7947e057389481d609c94b8fa087
@@ -221,6 +245,30 @@ corpora:
   - file: transitions/pilot-B2-r16-transitions-0000.jsonl
     cid: bac74f1ff6fadacf7ddf9e417c4265d492f92c7ced9c39978a0aec0348f5ea1d
     records: 7
+  - file: transitions/pilot-L-r1-transitions-0000.jsonl
+    cid: 71b73c1a34554e3d5e03f0f09234fbe79a7a6926f774723ef13684e030a46865
+    records: 51
+  - file: transitions/pilot-L-r2-transitions-0000.jsonl
+    cid: 641f84e7e9d84e3dd8fd02d616d397dfb5c3f527b6bd5547d2a5725034d45e3e
+    records: 85
+  - file: transitions/pilot-L-r3-transitions-0000.jsonl
+    cid: ca028ad33315045455e3bef25102c158c088f41fd7b3d84433348653440b69e3
+    records: 94
+  - file: transitions/pilot-L-r4-transitions-0000.jsonl
+    cid: ad01b5425a324376dbb0df1cb7efacc43b4d5660cc62c231357d009f4c881a61
+    records: 97
+  - file: transitions/pilot-L-r5-transitions-0000.jsonl
+    cid: 7e37e250a92140e7eda8c21834adac15e5098988eb13a777661370c985edded2
+    records: 108
+  - file: transitions/pilot-L-r6-transitions-0000.jsonl
+    cid: c699328d6e6010121ce8b64100e4255d8d28e96b62f9da8a3e337d50809d8e25
+    records: 107
+  - file: transitions/pilot-L-r7-transitions-0000.jsonl
+    cid: 6152d3eb48d891108e6d27a1312457086d9ce96014dad565c623d5c99d983acf
+    records: 103
+  - file: transitions/pilot-L-r8-transitions-0000.jsonl
+    cid: aeec40b85e8c0d9f47810f9ba8233dc9080316a270c1fa17dd92b127847bbfe6
+    records: 108
 sources:
   mutants:
     run_id: mutants-20260911
@@ -259,3 +307,22 @@ sources:
     prover_config_cid: 7d0173f9632853031943c36f9c998e4098d1c98c0f8561b5147e0c5cf9c0d820
     n_transitions: 199
     round1_dedup: r1-dedup/NOTE.json
+  transitions_tier_l_goedel_v2_8b:
+    run_id: pilot-L
+    prover: tier-L-goedel-v2-8b
+    manifest_cid: afb2bb21d8b0c888042bcf61708671898bad658d85caa878acf6514ea06bd6a6
+    prover_config_cid: 5081fdc88987e06be14128d9ce66845087448111f31ae757ba42b41c2d1d2cfd
+    pins:
+      lean: v4.28.0
+      mathlib: 8f9d9cff6bd728b17a24e163c9402775d9e6a365
+      jin: f9d5c8d39bece41ceedf6346ef50ad1fb393260e
+      lean4checker: 66e11cea12f5ba215d76b15b7f8495141bf52c6c
+    regate_of: null
+    n_transitions: 753
+    rounds: 8
+    n_goals: 536
+    censored: 0
+    model: goedel-prover-v2-8b-q4km
+    note: 'quod Q-28: 24 rows from 8 walker-accepted, build-rejected scripts carry
+      on_accepted_path=true (attempt_verdict null); Q-27: 45 step-0 deaths from the
+      binder template'

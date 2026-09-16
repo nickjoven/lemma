@@ -47,9 +47,10 @@ def main() -> int:
     ap.add_argument("--attempts", action="store_true")
     ap.add_argument("--transitions", action="store_true")
     ap.add_argument("--replace", action="store_true", help="replace the corpus entries instead of appending shards")
+    ap.add_argument("--note", default="", help="a caveat recorded on the source block (e.g. a quod OPEN.yml item)")
     args = ap.parse_args()
     run_dir = Path(args.run_dir).resolve()
-    mpath = sorted(glob.glob(str(run_dir / "manifest-*.json")))[-1]
+    mpath = sorted(p for p in glob.glob(str(run_dir / "manifest-*.json")) if "/manifest-pre-" not in p)[-1]  # the pre-run seal is not the manifest
     man = json.load(open(mpath))
     run_id = man["run_id"]
     log = run_dir / "driver.log"
@@ -71,20 +72,32 @@ def main() -> int:
         lm["sources"]["attempts"] = src_block
         print(f"attempts: {entry}")
     if args.transitions:
-        shards = man["transitions"]["shards"]
+        tr = man["transitions"]
+        # attempt.py writes one flat shard list; the batch driver (attempt_b.py, tiers B and L) writes one
+        # list per round under r<N>/, and the copied file carries the round in its name.
+        if "rounds" in tr:
+            shards = [(f"r{r['round']}", s) for r in tr["rounds"] for s in r["shards"]]
+            src_key = "transitions_" + man["prover"].lower().replace("-", "_")
+            totals = {"n_transitions": tr["n_transitions"], "rounds": len(tr["rounds"]),
+                      "n_goals": sum(r["n_goals"] for r in tr["rounds"]), "censored": sum(r["censored"] for r in tr["rounds"])}
+        else:
+            shards = [("", s) for s in tr["shards"]]
+            src_key = "transitions"
+            totals = {"n_transitions": tr["n_transitions"], "n_goals": tr["n_goals"], "censored": tr["censored"],
+                      "accepted_path_fraction": tr["accepted_path_fraction"]}
         for kind in ("goals", "transitions"):
             entries = []
-            for s in shards:
+            for rnd, s in shards:
                 if s["kind"] != kind or not s.get("cid"):
                     continue
-                dst = CORPORA / kind / f"{run_id}-{Path(s['file']).name}"
-                copy_verified(run_dir / s["file"], dst, s["cid"])
+                tag = f"{run_id}-{rnd}-" if rnd else f"{run_id}-"
+                dst = CORPORA / kind / f"{tag}{Path(s['file']).name}"
+                copy_verified(run_dir / rnd / s["file"], dst, s["cid"])
                 entries.append({"file": str(dst.relative_to(CORPORA)), "cid": s["cid"], "records": s["records"]})
             lm["corpora"][kind] = entries if args.replace else [*lm["corpora"].get(kind, []), *entries]
             print(f"{kind}: {len(entries)} shard(s), {sum(e['records'] for e in entries)} records")
-        lm["sources"]["transitions"] = {**src_block, "n_transitions": man["transitions"]["n_transitions"],
-                                        "n_goals": man["transitions"]["n_goals"], "censored": man["transitions"]["censored"],
-                                        "accepted_path_fraction": man["transitions"]["accepted_path_fraction"]}
+        lm["sources"][src_key] = {**src_block, **totals, **({"model": man["prover_config"]["model"]} if "prover_config" in man else {}),
+                                  **({"note": args.note} if args.note else {})}
     MANIFEST.write_text(yaml.safe_dump(lm, sort_keys=False))
     print(f"MANIFEST.yml updated from {run_id} (manifest CID {manifest_cid[:12]}…)")
     return 0
