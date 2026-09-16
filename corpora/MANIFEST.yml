@@ -241,6 +241,18 @@ corpora:
   - file: goals/test200-L2-r8-goals-0000.jsonl
     cid: 353f59ad7aa4f3a8848bed81efbef65bf412a55259f33ce00042bacda906db50
     records: 201
+  - file: goals/pilot-L2-neg-r1-goals-0000.jsonl
+    cid: 556d0433220edeaf240afa8a0f58b9d6f69de4730ffaa58d9793f0d09908353b
+    records: 3
+  - file: goals/pilot-L2-neg-r2-goals-0000.jsonl
+    cid: 85c2d11f3d07037376c3cb961d8522f6cef645971d5d248a153ed654c6a1bb33
+    records: 40
+  - file: goals/pilot-L2-neg-r3-goals-0000.jsonl
+    cid: 61d1079b6df17fe98024e1672d2bfdb4151388c72979ea405bd6ec62b80b35de
+    records: 53
+  - file: goals/pilot-L2-neg-r4-goals-0000.jsonl
+    cid: c0dea5af617fcbcef57c1bf58bb534d0854efba8d588c549b3cedb5b62959e49
+    records: 55
   transitions:
   - file: transitions/theorems-A-t1-transitions-0000.jsonl
     cid: 5ecb295db054c4bac537c7cb84387b913cdc7947e057389481d609c94b8fa087
@@ -389,6 +401,18 @@ corpora:
   - file: transitions/test200-L2-r8-transitions-0000.jsonl
     cid: fab71997ec064c2455cb070b22eef01058eb96968a887470041ef143940a7c3f
     records: 395
+  - file: transitions/pilot-L2-neg-r1-transitions-0000.jsonl
+    cid: 1f0762f69d652a7fc1e3d23c0f6066f59f427d1526233a8630405cb4cac54a58
+    records: 3
+  - file: transitions/pilot-L2-neg-r2-transitions-0000.jsonl
+    cid: eb81e2a1b45e5678eb8819b878ca70fbcd84e78802c073808df7bca572bb3e4b
+    records: 40
+  - file: transitions/pilot-L2-neg-r3-transitions-0000.jsonl
+    cid: 5c0c632b8d117f2302a245d6a28aab0fc5151fa519f4ee39fa90dd00d8444930
+    records: 52
+  - file: transitions/pilot-L2-neg-r4-transitions-0000.jsonl
+    cid: 4680621a47a9b5e12a2b8ff9d237674f9ec56f8f23299b55166d85a7b60ae736
+    records: 55
 sources:
   mutants:
     run_id: mutants-20260911
@@ -445,20 +469,19 @@ sources:
     model: goedel-prover-v2-8b-q4km
     note: 'not-T control (statements negated): 0/50 accepted; quod exit3-tierL.json'
   transitions_tier_l_goedel_v2_8b_sig:
-    run_id: test200-L2
+    run_id: pilot-L2-neg
     prover: tier-L-goedel-v2-8b-sig
-    manifest_cid: 1235765f8d19b4f47de2fcbe4d4e1a3384da1056e042633476086a154270d6e9
-    prover_config_cid: 06f70884aec4fc9effb5de7739f6e8827cb912983d9b01e59e4fe50e9b959637
+    manifest_cid: 48ccca5e2a2b39d5d98903d3c2a9cce2e034d66f90007461a14ce57678f2048d
+    prover_config_cid: 00a2646c08757b7e51bd3ae450bcb9627eeb03c33bcf16065165662d95331f74
     pins:
       lean: v4.28.0
       mathlib: 8f9d9cff6bd728b17a24e163c9402775d9e6a365
       jin: f9d5c8d39bece41ceedf6346ef50ad1fb393260e
       lean4checker: 66e11cea12f5ba215d76b15b7f8495141bf52c6c
     regate_of: null
-    n_transitions: 3057
-    rounds: 8
-    n_goals: 1550
-    censored: 14
+    n_transitions: 150
+    rounds: 4
+    n_goals: 151
+    censored: 0
     model: goedel-prover-v2-8b-q4km
-    note: 'tier L v2 test (frame minus pilot, 200 theorems): 34/200, exit 1 pass at
-      every level; quod exit1-tierL2.json test block'
+    note: 'tier L v2 not-T control: 0/50; quod exit3-tierL2.json'
