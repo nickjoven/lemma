@@ -1,15 +1,13 @@
 """W0 model plumbing on a tiny encoder (CPU): shapes, unknown tactic, censored
 cost loss finite and ordering-correct."""
 
+import copy
 import math
 
 import torch
-
-from lemma.models.encoder import Encoder, EncoderConfig
-import copy
-
 from safetensors.torch import load_file
 
+from lemma.models.encoder import Encoder, EncoderConfig
 from lemma.train_w0 import OUTCOMES, BestPair, WorldModel, tobit_nll
 
 

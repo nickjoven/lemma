@@ -77,7 +77,7 @@ def ket_get_verified(cid: str) -> bytes:
 
 def git_head() -> str:
     r = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], capture_output=True, text=True
+        ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], capture_output=True, text=True, check=False
     )
     return r.stdout.strip() if r.returncode == 0 else "no-git"
 
@@ -94,12 +94,12 @@ def source_state(repo: Path | None = None) -> dict:
     every untracked, non-ignored file (git status --porcelain, untracked=all)."""
     repo = repo or REPO_ROOT
     head = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
-                          capture_output=True, text=True)
+                          capture_output=True, text=True, check=False)
     if head.returncode != 0:
         return {"head": "no-git", "dirty": True, "changed": ["<not a git checkout>"]}
     st = subprocess.run(["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=all",
                          "--", *SOURCE_PATHS], capture_output=True, text=True, check=True)
-    changed = sorted(line[3:] for line in st.stdout.splitlines() if line.strip())
+    changed = sorted(_porcelain_path(line) for line in st.stdout.splitlines() if line.strip())
     return {"head": head.stdout.strip(), "dirty": bool(changed), "changed": changed}
 
 
@@ -118,8 +118,33 @@ def source_snapshot(changed: list[str], repo: Path | None = None) -> str:
     return ket_put_json({"base_commit": git_head(), "files": files})
 
 
+def _porcelain_path(line: str) -> str:
+    """The on-disk path of one `git status --porcelain` line: a rename or copy
+    reads `XY old -> new` (the new path is the one whose bytes matter), and a
+    path with unusual characters is C-quoted."""
+    p = line[3:]
+    if " -> " in p:
+        p = p.split(" -> ", 1)[1]
+    if len(p) >= 2 and p[0] == p[-1] == '"':
+        p = p[1:-1].encode("latin-1").decode("unicode_escape").encode("latin-1").decode("utf-8")
+    return p
+
+
 class DirtySourceError(LedgerError):
     pass
+
+
+def preflight_source(dirty_source: str | None = None) -> None:
+    """start_run's source-provenance refusal, callable BEFORE any compute: a
+    dirty tree under the reject policy is refused here instead of after the GPU
+    work and the evidence puts. start_run repeats the check; this only moves
+    the refusal earlier."""
+    state = source_state()
+    policy = dirty_source or os.environ.get("LEMMA_DIRTY_SOURCE", "reject")
+    if state["dirty"] and policy != "snapshot":
+        raise DirtySourceError(
+            "source differs from the checked-out commit; commit first, or seal the exact bytes with "
+            f"LEMMA_DIRTY_SOURCE=snapshot: {', '.join(state['changed'])}")
 
 
 def now_iso() -> str:

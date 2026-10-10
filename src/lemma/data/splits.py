@@ -1,8 +1,8 @@
 """Leakage-aware splits.
 
 Rules (in force for every stage):
-  1. The unit of assignment is the top-level Mathlib module: everything under
-     one `Mathlib.<Area>` prefix lands in one split.
+  1. The unit of assignment is the full module path: every declaration of
+     one module lands in one split (split_key says why not the area).
   2. No lock crosses a split: two declarations that share a lock (a dedup
      pair) land in one split. Since rule 1 also holds, the modules they live
      in must land in one split too, so the real unit of assignment is a
@@ -99,7 +99,7 @@ def component_stats(rows: list[DeclarationRow]) -> dict:
     be lumpy or that a family of duplicated statements spans many files."""
     comp = _components(rows)
     sizes: dict[str, int] = defaultdict(int)
-    for m, key in comp.items():
+    for key in comp.values():
         sizes[key] += 1
     multi = {k: n for k, n in sizes.items() if n > 1}
     return {

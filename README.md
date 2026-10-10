@@ -48,7 +48,7 @@ from the metrics record named in its row, which lives in the tracked
 | `w0-eval-w0-world-20260912-124023` | W0 v2 eval | next-state MRR vs offset + 0.10; margin over lexical; permutation | 0.733 vs bar 0.689; +27.8; permuted 0.015 | bar 0.689 | completed (pass) | `d991f7e1` | 7 s |
 
 - **S3 failed twice** (`OPEN.yml` L-1). The statement tower is strong (S2 MRR
-  0.992); the gloss tower is limited by a Lean-only tokenizer that
+  0.992, full-corpus duplicate retrieval, L-9); the gloss tower is limited by a Lean-only tokenizer that
   byte-fallbacks English docstrings. Recorded citation limit: useful for gross
   prose/statement mismatch only (easy-drift AUC 0.977), not for same-module
   fidelity.
@@ -65,8 +65,8 @@ from the metrics record named in its row, which lives in the tracked
 
 | piece | path | what it does |
 |---|---|---|
-| Ledger | [`src/lemma/ledger.py`](src/lemma/ledger.py) | The only code path that writes metrics. `finish_run` refuses a completed run without a `metrics_cid`; `citable(run_id)` returns a record only if its metrics still resolve in the store. |
-| Splits | [`src/lemma/data/splits.py`](src/lemma/data/splits.py) | Deterministic module-level assignment (BLAKE3 of the module name, no RNG); a lock never crosses a split; a mutant inherits its parent's split; the manifest discloses train/test dependency Jaccard. |
+| Ledger | [`src/lemma/ledger.py`](src/lemma/ledger.py) | The only code path that writes metrics. `finish_run` refuses a completed run without a `metrics_cid`; `citable(run_id)` returns a record only if its metrics resolve in the store, hash to their CID, and name that run. |
+| Splits | [`src/lemma/data/splits.py`](src/lemma/data/splits.py) | Deterministic assignment per connected component of modules joined by shared locks (BLAKE3 of the component's smallest module name, no RNG), so a module lands whole and a lock never crosses a split; a mutant inherits its parent's split; the manifest discloses component sizes and train/test dependency Jaccard (L-12: one component holds 45% of the rows). |
 | Corpus reader | [`src/lemma/data/corpus.py`](src/lemma/data/corpus.py) | Verifies every shard's BLAKE3 against [`corpora/MANIFEST.yml`](corpora/MANIFEST.yml) before parsing; a mismatch is an error. |
 | Encoder | [`src/lemma/models/encoder.py`](src/lemma/models/encoder.py), [`heads.py`](src/lemma/models/heads.py) | 33M params: 8 layers, d=512, 8 heads, RoPE, pre-norm, SDPA; mean-pooled statement embedding. |
 | Objectives | [`src/lemma/objectives/`](src/lemma/objectives/) | Span-MLM ([`mlm.py`](src/lemma/objectives/mlm.py)) and symmetric InfoNCE ([`contrastive.py`](src/lemma/objectives/contrastive.py)). |
@@ -155,7 +155,7 @@ rationale as recorded in this repository.
 |---|---|---|---|
 | A metric without a `metrics_cid` does not exist; one code path writes metrics | Metrics in logs, notebooks, or commit messages | `finish_run` refuses a completed run with no metrics; `citable` re-resolves the CID before returning a record, so a number that cannot be fetched cannot be cited | [`src/lemma/ledger.py`](src/lemma/ledger.py); `CLAUDE.md` |
 | Provenance travels with the code: the evidence store is tracked | A store outside the repository | The metrics, configs, tokenizer, and calibration records that the ledger cites are in `.ket/`; only the checkpoints are excluded, each by its own CID line in `.gitignore` | `CLAUDE.md` ("federation model"); [`.gitignore`](.gitignore) |
-| Split unit is the full module path | Top-level Mathlib area | Area-level splitting gave about 50 units; a 90/5/5 split came out lumpy and val was empty. Module-level keeps same-file declarations together and yields thousands of units | [`src/lemma/data/splits.py`](src/lemma/data/splits.py) (`split_key`) |
+| Split unit is the connected component of full module paths joined by shared locks | Top-level Mathlib area; per-row assignment | Area-level splitting gave about 50 units; a 90/5/5 split came out lumpy and val was empty. Module-level keeps same-file declarations together and yields thousands of units; joining modules that share a lock makes the module rule and the lock rule hold together (#6), at the cost of one giant component (L-12) | [`src/lemma/data/splits.py`](src/lemma/data/splits.py) (`split_key`) |
 | A lock never crosses a split; a mutant inherits its parent's split; unknown parents are excluded, never guessed | Independent assignment per row | Same theorem under two names in different splits is a leak; a mutant of a train theorem in test is a leak; the rules are tested | [`src/lemma/data/splits.py`](src/lemma/data/splits.py); [`tests/test_splits.py`](tests/test_splits.py) |
 | Train/test dependency overlap is disclosed in the split manifest | Hide it or claim independence | Cross-module proof-constant overlap is real; the manifest reports `train_test_dep_jaccard` rather than asserting none | [`src/lemma/data/splits.py`](src/lemma/data/splits.py) (`manifest`) |
 | `readable_pp` is the encoder input; `pp.all` stays the lock identity | Feed the canonical `pp.all` string | `readable_pp` tokenizes to p50 = 88 / p99 = 309 tokens with 0.17% over 512, so seq 512 is comfortable; the `pp.all` 1024/batch-48 stopgap was retired | [`configs/s2_mlm.yaml`](configs/s2_mlm.yaml); commit `c283a57` |

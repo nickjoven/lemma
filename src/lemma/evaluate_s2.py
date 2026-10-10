@@ -3,8 +3,10 @@
 The plan's falsifiable gate for the S2 encoder: mean-pooled embeddings must
 retrieve exact-duplicate statements (declarations sharing a LOCK — the same
 theorem stated under two names) at MRR >= 0.95, on HELD-OUT data: queries and
-candidates both come from the test split of the verified split manifest, and
-no lock in the pool occurs in train or val (lemma #5: the earlier evaluator
+candidates both come from the test split OF THE SPLIT MANIFEST THE CHECKPOINT
+WAS TRAINED AGAINST (the training cache's split-manifest.json, by CID; a fresh
+assignment under today's rule is not held out relative to an older run), and
+no lock of that split occurs in train or val (lemma #5: the earlier evaluator
 sampled the whole corpus, so its number is full-corpus duplicate retrieval).
 Controls, per the doctrine that a metric without its controls is not citable:
   positive  same-lock pairs -> should retrieve each other at rank ~1
@@ -28,13 +30,13 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
+import blake3
 import numpy as np
 import torch
 from safetensors.torch import load_file
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data import splits
 from .data.corpus import CorpusError, encoder_text, iter_rows
 from .models.encoder import Encoder, EncoderConfig
 
@@ -65,11 +67,36 @@ def embed(enc: Encoder, tok: Tokenizer, texts: list[str], device: str, bs: int =
     return torch.cat(out)
 
 
+def trained_split(manifest_path: Path, recorded_cid: str | None, rows) -> tuple[dict[str, str], str, str]:
+    """The split assignment the checkpoint was trained against: the split
+    manifest its training cache was built from, taken by its bytes. Returns
+    (assignment, cid, rule). Refuses a manifest whose CID is not the one the
+    train record names (when it names one), one whose per-split counts differ
+    from the cache report beside it, and one that does not cover every corpus
+    row: each would make \"held-out\" a guess."""
+    data = manifest_path.read_bytes()
+    cid = blake3.blake3(data).hexdigest()
+    if recorded_cid is not None and recorded_cid != cid:
+        raise CorpusError(f"split manifest {manifest_path} hashes to {cid}, but the train run records {recorded_cid}")
+    manifest = json.loads(data)
+    assign = manifest["assignment"]
+    report = manifest_path.with_name("cache-report.json")
+    if report.exists():
+        want = {s: v["sequences"] for s, v in json.loads(report.read_text())["splits"].items()}
+        got = {s: sum(1 for v in assign.values() if v == s) for s in want}
+        if got != want:
+            raise CorpusError(f"split manifest counts {got} differ from the training cache {want}")
+    missing = [r.name for r in rows if r.name not in assign]
+    if missing:
+        raise CorpusError(f"{len(missing)} corpus rows are not in the split manifest (e.g. {missing[:3]})")
+    return assign, cid, manifest.get("rule", "?")
+
+
 def heldout_pool(rows, assign: dict[str, str], n_groups: int, n_distractors: int,
                  rng: random.Random, split: str = "test"):
     """Queries and candidates drawn from `split` only. Returns (members,
-    distractors, stats). Raises CorpusError if any pooled lock also occurs
-    outside the split: that would be leakage, and splits.assign() promises it
+    distractors, stats). Raises CorpusError if any lock of the split also
+    occurs outside it: that would be leakage, and the split rule promises it
     cannot happen, so it is checked rather than trusted."""
     in_split = [r for r in rows if assign.get(r.name) == split]
     outside_locks = {r.lock for r in rows if assign.get(r.name) != split}
@@ -77,9 +104,10 @@ def heldout_pool(rows, assign: dict[str, str], n_groups: int, n_distractors: int
     for r in in_split:
         by_lock[r.lock].append(r)
     groups = [sorted(g, key=lambda r: r.name) for g in by_lock.values() if len(g) >= 2]
-    leaked = sorted({g[0].lock for g in groups} & outside_locks)
+    leaked = sorted({r.lock for r in in_split} & outside_locks)   # every lock of the split, not only the queried ones
     if leaked:
-        raise CorpusError(f"{len(leaked)} pooled lock(s) also occur outside the {split} split: {leaked[:3]}")
+        raise CorpusError(f"{len(leaked)} lock(s) of the {split} split also occur outside the {split} split: {leaked[:3]}")
+    n_duplicate_groups = len(groups)            # before truncation to n_groups
     groups.sort(key=lambda g: g[0].lock)        # order independent of shard order
     rng.shuffle(groups)
     groups = groups[:n_groups]
@@ -88,7 +116,7 @@ def heldout_pool(rows, assign: dict[str, str], n_groups: int, n_distractors: int
     candidates = sorted((r for r in in_split if r.name not in member_names), key=lambda r: r.name)
     distractors = rng.sample(candidates, min(n_distractors, len(candidates)))
     stats = {"split": split, "rows_in_split": len(in_split), "groups_available": len(by_lock),
-             "duplicate_groups_available": len(groups) if n_groups >= len(groups) else None,
+             "duplicate_groups_available": n_duplicate_groups,
              "groups": len(groups), "queries": len(members), "distractors": len(distractors),
              "query_names_cid": None, "pool_names_cid": None}
     return members, distractors, stats
@@ -125,7 +153,10 @@ def main() -> int:
     ap.add_argument("--distractors", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=1337)
     ap.add_argument("--split", default="test", help="held-out split to evaluate on")
+    ap.add_argument("--split-manifest", type=Path, default=REPO_ROOT / "corpora" / "cache" / "split-manifest.json",
+                    help="the split manifest the checkpoint's training cache was built from")
     args = ap.parse_args()
+    ledger.preflight_source()   # refuse a dirty tree before the GPU work, not after
 
     train_rec = ledger.citable(args.run)
     ckpt = REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors"
@@ -134,7 +165,9 @@ def main() -> int:
     enc = load_encoder(ckpt, tok.get_vocab_size(), device)
 
     rows = list(iter_rows("declarations", verify=False))
-    assign = splits.assign(rows)
+    assign, split_manifest_cid, split_rule = trained_split(args.split_manifest, train_rec.inputs.split_manifest_cid, rows)
+    if ledger.ket_put(args.split_manifest.read_bytes()) != split_manifest_cid:   # the manifest must resolve in the store
+        raise CorpusError("the split manifest's store CID differs from its BLAKE3")
     rng = random.Random(args.seed)
     members, distractors, pool_stats = heldout_pool(rows, assign, args.groups, args.distractors, rng, args.split)
     groups = pool_stats["groups"]
@@ -143,6 +176,8 @@ def main() -> int:
     locks = [r.lock for r in pool]
     modules = [r.module for r in pool]
     # the identities behind every number, sealed: which statements were asked and offered
+    pool_stats["split_manifest_cid"] = split_manifest_cid
+    pool_stats["split_rule"] = split_rule
     pool_stats["query_names_cid"] = ledger.ket_put_json([r.name for r in members])
     pool_stats["pool_names_cid"] = ledger.ket_put_json([r.name for r in pool])
 
@@ -210,7 +245,7 @@ def main() -> int:
                                 config_cid=train_rec.inputs.config_cid,
                                 init_checkpoint_cid=train_rec.checkpoint_cids[-1],
                                 code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin,
-                                split_manifest_cid=ledger.ket_put_json(splits.manifest(rows))),
+                                split_manifest_cid=split_manifest_cid),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
     ledger.start_run(rec)
     rec.calibration_record_cid = ledger.ket_put_json(calib)

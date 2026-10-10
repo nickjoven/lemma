@@ -9,7 +9,6 @@ import blake3
 import pytest
 
 from lemma import ledger
-from conftest import git_repo
 from lemma.schemas import RunInputs, RunRecord
 
 

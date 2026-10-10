@@ -71,3 +71,62 @@ def test_mrr_helpers():
     assert mrr == 1.0 and hit1 == 1.0
     assert exact_text_mrr(["s", "s", "t"], locks, 2) == 1.0
     assert exact_text_mrr(["s", "s2", "t"], locks, 2) == 0.0
+
+
+def test_duplicate_groups_available_is_counted_before_truncation():
+    rows = fixture_rows()
+    assign = splits.assign(rows)
+    in_test = [r for r in rows if assign[r.name] == "test"]
+    available = len({r.lock for r in in_test if sum(1 for x in in_test if x.lock == r.lock) >= 2})
+    assert available >= 1, "fixture must put a duplicate group in test"
+    _, _, stats = heldout_pool(rows, assign, 1, 10, random.Random(0))
+    assert stats["groups"] == 1 and stats["duplicate_groups_available"] == available
+
+
+def _manifest(tmp_path, rows, assign, counts=None):
+    import json
+
+    import blake3
+    path = tmp_path / "split-manifest.json"
+    data = json.dumps({"rule": "fixture", "assignment": assign}).encode()
+    path.write_bytes(data)
+    counts = counts or {s: sum(1 for v in assign.values() if v == s) for s in splits.SPLITS}
+    (tmp_path / "cache-report.json").write_text(json.dumps({"splits": {s: {"sequences": n} for s, n in counts.items()}}))
+    return path, blake3.blake3(data).hexdigest()
+
+
+def test_trained_split_takes_the_manifest_the_checkpoint_trained_against(tmp_path):
+    from lemma.evaluate_s2 import trained_split
+    rows = fixture_rows()
+    assign = splits.assign(rows)
+    path, cid = _manifest(tmp_path, rows, assign)
+    got, got_cid, rule = trained_split(path, None, rows)
+    assert got == assign and got_cid == cid and rule == "fixture"
+    assert trained_split(path, cid, rows)[1] == cid
+
+
+def test_trained_split_refuses_a_manifest_the_train_record_does_not_name(tmp_path):
+    from lemma.evaluate_s2 import trained_split
+    rows = fixture_rows()
+    path, _ = _manifest(tmp_path, rows, splits.assign(rows))
+    with pytest.raises(CorpusError, match="train run records"):
+        trained_split(path, "0" * 64, rows)
+
+
+def test_trained_split_refuses_a_manifest_that_does_not_match_its_cache(tmp_path):
+    from lemma.evaluate_s2 import trained_split
+    rows = fixture_rows()
+    assign = splits.assign(rows)
+    path, _ = _manifest(tmp_path, rows, assign, counts={"train": 1, "val": 1, "test": 1})
+    with pytest.raises(CorpusError, match="differ from the training cache"):
+        trained_split(path, None, rows)
+
+
+def test_trained_split_refuses_a_manifest_that_does_not_cover_the_corpus(tmp_path):
+    from lemma.evaluate_s2 import trained_split
+    rows = fixture_rows()
+    assign = splits.assign(rows)
+    path, _ = _manifest(tmp_path, rows, assign)
+    rows.append(decl("new", "Mathlib.New.A", "newlock"))
+    with pytest.raises(CorpusError, match="not in the split manifest"):
+        trained_split(path, None, rows)
