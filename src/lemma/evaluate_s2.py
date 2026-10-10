@@ -2,11 +2,19 @@
 
 The plan's falsifiable gate for the S2 encoder: mean-pooled embeddings must
 retrieve exact-duplicate statements (declarations sharing a LOCK — the same
-theorem stated under two names) at MRR >= 0.95. Controls, per the doctrine
-that a metric without its controls is not citable:
+theorem stated under two names) at MRR >= 0.95, on HELD-OUT data: queries and
+candidates both come from the test split OF THE SPLIT MANIFEST THE CHECKPOINT
+WAS TRAINED AGAINST (the training cache's split-manifest.json, by CID; a fresh
+assignment under today's rule is not held out relative to an older run), and
+no lock of that split occurs in train or val (lemma #5: the earlier evaluator
+sampled the whole corpus, so its number is full-corpus duplicate retrieval).
+Controls, per the doctrine that a metric without its controls is not citable:
   positive  same-lock pairs -> should retrieve each other at rank ~1
   negative  random cross-module pairs -> should NOT be nearest neighbours
   baseline  masked-token accuracy vs. a unigram-majority predictor
+  baseline  exact-text retrieval: how much of the pool is retrievable by
+            string equality alone, and an UNTRAINED encoder of the same shape
+            on the same pool; learned generalization is the margin over both
 
 Every number is written to the ledger (metrics_cid) or it does not exist.
 
@@ -22,13 +30,14 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
+import blake3
 import numpy as np
 import torch
 from safetensors.torch import load_file
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data.corpus import encoder_text, iter_rows
+from .data.corpus import CorpusError, encoder_text, iter_rows
 from .models.encoder import Encoder, EncoderConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -58,13 +67,96 @@ def embed(enc: Encoder, tok: Tokenizer, texts: list[str], device: str, bs: int =
     return torch.cat(out)
 
 
+def trained_split(manifest_path: Path, recorded_cid: str | None, rows) -> tuple[dict[str, str], str, str]:
+    """The split assignment the checkpoint was trained against: the split
+    manifest its training cache was built from, taken by its bytes. Returns
+    (assignment, cid, rule). Refuses a manifest whose CID is not the one the
+    train record names (when it names one), one whose per-split counts differ
+    from the cache report beside it, and one that does not cover every corpus
+    row: each would make \"held-out\" a guess."""
+    data = manifest_path.read_bytes()
+    cid = blake3.blake3(data).hexdigest()
+    if recorded_cid is not None and recorded_cid != cid:
+        raise CorpusError(f"split manifest {manifest_path} hashes to {cid}, but the train run records {recorded_cid}")
+    manifest = json.loads(data)
+    assign = manifest["assignment"]
+    report = manifest_path.with_name("cache-report.json")
+    if report.exists():
+        want = {s: v["sequences"] for s, v in json.loads(report.read_text())["splits"].items()}
+        got = {s: sum(1 for v in assign.values() if v == s) for s in want}
+        if got != want:
+            raise CorpusError(f"split manifest counts {got} differ from the training cache {want}")
+    missing = [r.name for r in rows if r.name not in assign]
+    if missing:
+        raise CorpusError(f"{len(missing)} corpus rows are not in the split manifest (e.g. {missing[:3]})")
+    return assign, cid, manifest.get("rule", "?")
+
+
+def heldout_pool(rows, assign: dict[str, str], n_groups: int, n_distractors: int,
+                 rng: random.Random, split: str = "test"):
+    """Queries and candidates drawn from `split` only. Returns (members,
+    distractors, stats). Raises CorpusError if any lock of the split also
+    occurs outside it: that would be leakage, and the split rule promises it
+    cannot happen, so it is checked rather than trusted."""
+    in_split = [r for r in rows if assign.get(r.name) == split]
+    outside_locks = {r.lock for r in rows if assign.get(r.name) != split}
+    by_lock: dict[str, list] = defaultdict(list)
+    for r in in_split:
+        by_lock[r.lock].append(r)
+    groups = [sorted(g, key=lambda r: r.name) for g in by_lock.values() if len(g) >= 2]
+    leaked = sorted({r.lock for r in in_split} & outside_locks)   # every lock of the split, not only the queried ones
+    if leaked:
+        raise CorpusError(f"{len(leaked)} lock(s) of the {split} split also occur outside the {split} split: {leaked[:3]}")
+    n_duplicate_groups = len(groups)            # before truncation to n_groups
+    groups.sort(key=lambda g: g[0].lock)        # order independent of shard order
+    rng.shuffle(groups)
+    groups = groups[:n_groups]
+    members = [r for g in groups for r in g]
+    member_names = {r.name for r in members}
+    candidates = sorted((r for r in in_split if r.name not in member_names), key=lambda r: r.name)
+    distractors = rng.sample(candidates, min(n_distractors, len(candidates)))
+    stats = {"split": split, "rows_in_split": len(in_split), "groups_available": len(by_lock),
+             "duplicate_groups_available": n_duplicate_groups,
+             "groups": len(groups), "queries": len(members), "distractors": len(distractors),
+             "query_names_cid": None, "pool_names_cid": None}
+    return members, distractors, stats
+
+
+def same_lock_mrr(sims: torch.Tensor, locks: list[str], n_queries: int) -> tuple[float, float]:
+    """MRR and hit@1 of the nearest OTHER same-lock statement for each of the
+    first n_queries rows; the diagonal must already be masked."""
+    rr = []
+    for i in range(n_queries):
+        order = torch.argsort(sims[i], descending=True)
+        for rank, j in enumerate(order.tolist(), start=1):
+            if locks[j] == locks[i]:
+                rr.append(1.0 / rank)
+                break
+    return float(np.mean(rr)), float(np.mean([r == 1.0 for r in rr]))
+
+
+def exact_text_mrr(texts: list[str], locks: list[str], n_queries: int) -> float:
+    """What string equality alone retrieves: a query scores 1 if another
+    same-lock statement has byte-identical encoder text, else 0. If this is
+    close to the model's MRR the task is duplicate detection, not semantics."""
+    hits = []
+    for i in range(n_queries):
+        hits.append(1.0 if any(j != i and locks[j] == locks[i] and texts[j] == texts[i]
+                               for j in range(len(texts))) else 0.0)
+    return float(np.mean(hits))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", required=True, help="sealed S2 train run_id")
     ap.add_argument("--groups", type=int, default=2000, help="same-lock groups to sample")
     ap.add_argument("--distractors", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=1337)
+    ap.add_argument("--split", default="test", help="held-out split to evaluate on")
+    ap.add_argument("--split-manifest", type=Path, default=REPO_ROOT / "corpora" / "cache" / "split-manifest.json",
+                    help="the split manifest the checkpoint's training cache was built from")
     args = ap.parse_args()
+    ledger.preflight_source()   # refuse a dirty tree before the GPU work, not after
 
     train_rec = ledger.citable(args.run)
     ckpt = REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors"
@@ -73,20 +165,21 @@ def main() -> int:
     enc = load_encoder(ckpt, tok.get_vocab_size(), device)
 
     rows = list(iter_rows("declarations", verify=False))
-    by_lock: dict[str, list] = defaultdict(list)
-    for r in rows:
-        by_lock[r.lock].append(r)
-    groups = [g for g in by_lock.values() if len(g) >= 2]
+    assign, split_manifest_cid, split_rule = trained_split(args.split_manifest, train_rec.inputs.split_manifest_cid, rows)
+    if ledger.ket_put(args.split_manifest.read_bytes()) != split_manifest_cid:   # the manifest must resolve in the store
+        raise CorpusError("the split manifest's store CID differs from its BLAKE3")
     rng = random.Random(args.seed)
-    rng.shuffle(groups)
-    groups = groups[:args.groups]
-    members = [r for g in groups for r in g]
-    member_names = {r.name for r in members}
-    distractors = rng.sample([r for r in rows if r.name not in member_names], args.distractors)
+    members, distractors, pool_stats = heldout_pool(rows, assign, args.groups, args.distractors, rng, args.split)
+    groups = pool_stats["groups"]
     pool = members + distractors
     texts = [encoder_text(r) for r in pool]
     locks = [r.lock for r in pool]
     modules = [r.module for r in pool]
+    # the identities behind every number, sealed: which statements were asked and offered
+    pool_stats["split_manifest_cid"] = split_manifest_cid
+    pool_stats["split_rule"] = split_rule
+    pool_stats["query_names_cid"] = ledger.ket_put_json([r.name for r in members])
+    pool_stats["pool_names_cid"] = ledger.ket_put_json([r.name for r in pool])
 
     t0 = time.monotonic()
     Z = embed(enc, tok, texts, device)
@@ -94,15 +187,16 @@ def main() -> int:
     sims.fill_diagonal_(-1.0)
 
     # positive control: rank of the nearest OTHER same-lock statement
-    rr = []
-    for i in range(len(members)):
-        order = torch.argsort(sims[i], descending=True)
-        for rank, j in enumerate(order.tolist(), start=1):
-            if locks[j] == locks[i]:
-                rr.append(1.0 / rank)
-                break
-    mrr = float(np.mean(rr))
-    hit1 = float(np.mean([r == 1.0 for r in rr]))
+    mrr, hit1 = same_lock_mrr(sims, locks, len(members))
+
+    # baselines on the SAME pool: string equality, and an untrained encoder of the same shape
+    exact_mrr = exact_text_mrr(texts, locks, len(members))
+    torch.manual_seed(args.seed)
+    untrained = Encoder(EncoderConfig(vocab_size=tok.get_vocab_size())).to(device).eval()
+    Zu = embed(untrained, tok, texts, device)
+    sims_u = Zu @ Zu.T
+    sims_u.fill_diagonal_(-1.0)
+    untrained_mrr, _ = same_lock_mrr(sims_u, locks, len(members))
 
     # negative control: a random cross-module pair should not be top-1 for each other
     neg_top1 = 0
@@ -124,7 +218,11 @@ def main() -> int:
 
     metrics = {
         "same_lock_mrr": round(mrr, 4), "same_lock_hit@1": round(hit1, 4),
-        "queries": len(members), "pool": len(pool), "groups": len(groups),
+        "queries": len(members), "pool": len(pool), "groups": groups,
+        "heldout": pool_stats,
+        "same_lock_mrr_exact_text_baseline": round(exact_mrr, 4),
+        "same_lock_mrr_untrained_encoder": round(untrained_mrr, 4),
+        "same_lock_mrr_margin_over_exact_text": round(mrr - exact_mrr, 4),
         "neg_cross_module_top1_rate": round(neg_rate, 4),
         "masked_acc_model": round(model_acc, 4), "masked_acc_unigram_baseline": round(unigram_acc, 4),
         "masked_acc_margin_pts": round(100 * (model_acc - unigram_acc), 1),
@@ -133,7 +231,9 @@ def main() -> int:
     }
     calib = {"pass": metrics["pass_mrr"] and neg_rate < 0.05 and metrics["pass_margin"],
              "controls": [
-                 {"id": "same-lock-retrieval", "expect": f"MRR>={MRR_GATE}", "observed": mrr, "ok": metrics["pass_mrr"]},
+                 {"id": "same-lock-retrieval-heldout", "expect": f"MRR>={MRR_GATE} on the {args.split} split", "observed": mrr, "ok": metrics["pass_mrr"]},
+                 {"id": "exact-text-baseline", "expect": "reported; the margin is the learned part", "observed": exact_mrr, "ok": True},
+                 {"id": "untrained-encoder-baseline", "expect": "reported", "observed": untrained_mrr, "ok": True},
                  {"id": "cross-module-negative", "expect": "top1<0.05", "observed": neg_rate, "ok": neg_rate < 0.05},
                  {"id": "beats-unigram-by-25pts", "expect": ">=25", "observed": metrics["masked_acc_margin_pts"], "ok": metrics["pass_margin"]},
              ]}
@@ -144,7 +244,8 @@ def main() -> int:
                                 tokenizer_cid=train_rec.inputs.tokenizer_cid,
                                 config_cid=train_rec.inputs.config_cid,
                                 init_checkpoint_cid=train_rec.checkpoint_cids[-1],
-                                code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
+                                code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin,
+                                split_manifest_cid=split_manifest_cid),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
     ledger.start_run(rec)
     rec.calibration_record_cid = ledger.ket_put_json(calib)

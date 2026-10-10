@@ -15,7 +15,7 @@
     hard-negative batches and val early stopping (s3-gloss-20260911-012141, eval
     3d8a926c...): hard AUC 0.807, retrieval MRR 0.400 — mining gave +0.04 but the
     val probe saturated at ~0.84 and retrieval did not move at all. The statement
-    tower is strong (S2 same-lock MRR 0.992); the gloss tower is the limit: English
+    tower is strong (S2 same-lock MRR 0.992, full-corpus, L-9); the gloss tower is the limit: English
     docstrings are byte-fallbacked by the Lean-only tokenizer (CID 3b33be81...) and
     the shared encoder was MLM-pretrained on Lean statements only. This is a
     representation deficit, not a tuning gap. The model remains useful for gross
@@ -196,3 +196,63 @@
     transition against the measured Lean cost (wall_ms is recorded on every
     row) as the plan requires. Gate for the cost head: censored recall
     >= 0.5 at precision >= 0.5, and log-cost MAE <= 0.6 on uncensored rows.
+- id: L-9
+  severity: high
+  status: fix-pending (evaluator now restricted to the test split with exact-text and untrained-encoder baselines; the sealed number is not rerun)
+  title: S2 same-lock MRR 0.992 was measured on a full-corpus sample, not on held-out modules
+  detail: >
+    evaluate_s2 sampled duplicate groups and distractors from every row, with
+    no split filter, while the README said "held-out modules". The recorded
+    number stands as full-corpus duplicate retrieval and its evidence is kept;
+    the README is qualified. A renewed held-out claim needs a new sealed run
+    of the corrected evaluator (github issue #5).
+  fix: seal a new s2-eval run on the test split; report the margin over the
+    exact-text baseline as the learned part.
+- id: L-10
+  severity: high
+  status: fix-pending (start_run now refuses a source tree that differs from code_git, or seals the exact changed bytes under LEMMA_DIRTY_SOURCE=snapshot)
+  title: sealed run s2-eval-s2-mlm-20260909-141736 records a code_git that does not contain its evaluator
+  detail: >
+    inputs.code_git = 804d8cca..., but src/lemma/evaluate_s2.py first appears
+    at 022fe90. git_head() recorded HEAD without checking the working tree.
+    The record is preserved as is; its provenance is incomplete and no commit
+    is guessed for it (github issue #8).
+  fix: none for the old record; every new record carries code_git_dirty and
+    source_snapshot_cid when the tree was not the commit.
+- id: L-11
+  severity: high
+  status: fix-pending (BestPair saves the online model and the EMA target together at each best step; a role-labelled checkpoint manifest is sealed; the released run is not rerun)
+  title: W0 v2 released the best-step online model with the final-step EMA target
+  detail: >
+    validate() scored candidates with the target at that step but saved only
+    the online model; the target was saved after training. For
+    w0-world-20260912-124023, best_step 2500 < steps 4000, so the released
+    pair is not the pair that was scored. The README release table listed
+    only the target CID and no roles (github issue #9).
+  fix: rerun W0 under a new run id with the corrected trainer before changing
+    the reported number; the evaluation of the existing pair stands as the
+    evaluation of that pair.
+- id: L-12
+  severity: high
+  status: open (decision needed before the component rule is used for any new split manifest)
+  title: the connected-component split rule produces one giant component holding 45% of the corpus
+  detail: >
+    Under the rule on github #10 (modules joined by shared locks form one
+    unit), the 296,187-row declarations corpus has 7,107 modules in 5,152
+    components, 155 of them multi-module; the largest joins 1,748 modules /
+    133,474 rows (45%), keyed to Mathlib.Algebra.AddConstMap.Basic, and
+    hashes to train. Train/val/test move from 266,208/15,284/14,695 to
+    278,905/8,687/8,595; 14,522 rows change split; the test split keeps 170
+    duplicate groups / 345 queries (old rule 420 / 1,412) against the
+    evaluator's --groups 2000 default. A lock that joins hundreds of modules
+    is almost certainly degenerate (a statement that is the same under many
+    names). Measured in the review of #10 on 2026-09-24; the numbers are not
+    sealed. The old rule did violate module unity (496 modules split across
+    more than one split), so some fix is needed; which one is the decision.
+  fix: >
+    Decide one of: accept a 2.9% test split dominated by one hub; exclude
+    hub locks (a lock shared by more than K modules) from the join; or
+    exclude the giant component from val/test. Then seal the component
+    statistics with the next split manifest. Until decided, evaluators take
+    the manifest a checkpoint was trained against (evaluate_s2
+    --split-manifest), never a fresh assignment.

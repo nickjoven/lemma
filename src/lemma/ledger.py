@@ -16,6 +16,8 @@ import json
 import os
 import subprocess
 import time
+
+import blake3
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -61,11 +63,88 @@ def ket_get(cid: str) -> bytes:
     return r.stdout
 
 
+def ket_get_verified(cid: str) -> bytes:
+    """Read a blob and check that the bytes actually returned hash to `cid`
+    (a CID is the BLAKE3 hex of the content). Verifying the bytes in hand
+    rather than a separate `ket verify` closes the verify-then-read race and
+    catches a blob edited in place under its own name (lemma #7)."""
+    data = ket_get(cid)
+    got = blake3.blake3(data).hexdigest()
+    if got != cid:
+        raise LedgerError(f"evidence {cid} is corrupted: its bytes hash to {got}")
+    return data
+
+
 def git_head() -> str:
     r = subprocess.run(
-        ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], capture_output=True, text=True
+        ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], capture_output=True, text=True, check=False
     )
     return r.stdout.strip() if r.returncode == 0 else "no-git"
+
+
+# The paths whose bytes decide what a run computed. A commit hash names them
+# only if the working tree matched the commit; lemma #8 found a sealed run whose
+# recorded commit did not contain the evaluator that produced it.
+SOURCE_PATHS = ("src", "configs", "pyproject.toml", "uv.lock")
+
+
+def source_state(repo: Path | None = None) -> dict:
+    """{"head": <commit or no-git>, "dirty": bool, "changed": [paths]} for the
+    source paths: `changed` lists every tracked file that differs from HEAD and
+    every untracked, non-ignored file (git status --porcelain, untracked=all)."""
+    repo = repo or REPO_ROOT
+    head = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, check=False)
+    if head.returncode != 0:
+        return {"head": "no-git", "dirty": True, "changed": ["<not a git checkout>"]}
+    st = subprocess.run(["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=all",
+                         "--", *SOURCE_PATHS], capture_output=True, text=True, check=True)
+    changed = sorted(_porcelain_path(line) for line in st.stdout.splitlines() if line.strip())
+    return {"head": head.stdout.strip(), "dirty": bool(changed), "changed": changed}
+
+
+def source_snapshot(changed: list[str], repo: Path | None = None) -> str:
+    """Seal the exact bytes of every changed/untracked source file: each file
+    goes to the store under its own CID and the {path: cid} manifest's CID is
+    returned, so the code that ran is recoverable from the record alone."""
+    repo = repo or REPO_ROOT
+    files = {}
+    for rel in changed:
+        path = repo / rel
+        if path.is_file():
+            files[rel] = ket_put(path.read_bytes())
+        else:
+            files[rel] = None  # deleted relative to HEAD
+    return ket_put_json({"base_commit": git_head(), "files": files})
+
+
+def _porcelain_path(line: str) -> str:
+    """The on-disk path of one `git status --porcelain` line: a rename or copy
+    reads `XY old -> new` (the new path is the one whose bytes matter), and a
+    path with unusual characters is C-quoted."""
+    p = line[3:]
+    if " -> " in p:
+        p = p.split(" -> ", 1)[1]
+    if len(p) >= 2 and p[0] == p[-1] == '"':
+        p = p[1:-1].encode("latin-1").decode("unicode_escape").encode("latin-1").decode("utf-8")
+    return p
+
+
+class DirtySourceError(LedgerError):
+    pass
+
+
+def preflight_source(dirty_source: str | None = None) -> None:
+    """start_run's source-provenance refusal, callable BEFORE any compute: a
+    dirty tree under the reject policy is refused here instead of after the GPU
+    work and the evidence puts. start_run repeats the check; this only moves
+    the refusal earlier."""
+    state = source_state()
+    policy = dirty_source or os.environ.get("LEMMA_DIRTY_SOURCE", "reject")
+    if state["dirty"] and policy != "snapshot":
+        raise DirtySourceError(
+            "source differs from the checked-out commit; commit first, or seal the exact bytes with "
+            f"LEMMA_DIRTY_SOURCE=snapshot: {', '.join(state['changed'])}")
 
 
 def now_iso() -> str:
@@ -78,10 +157,29 @@ def append(record: RunRecord) -> None:
         f.write(record.model_dump_json() + "\n")
 
 
-def start_run(record: RunRecord) -> RunRecord:
-    """Record the run's intent before any compute. Inputs must already be CIDs."""
+def start_run(record: RunRecord, *, dirty_source: str | None = None) -> RunRecord:
+    """Record the run's intent before any compute. Inputs must already be CIDs.
+
+    Provenance (lemma #8): `inputs.code_git` names a commit, so the source
+    paths must match that commit. If they do not, the run is refused, unless
+    `dirty_source="snapshot"` (or LEMMA_DIRTY_SOURCE=snapshot) asks for the
+    exact bytes of the changed files to be sealed into the store first; the
+    record then carries `source_snapshot_cid` and `code_git_dirty=True` so a
+    reader can tell an exact commit from a commit-plus-snapshot.
+    """
     if not record.inputs.config_cid:
         raise LedgerError("a run without a config_cid is not startable")
+    state = source_state()
+    if record.inputs.code_git not in ("no-git", state["head"]):
+        raise LedgerError(f"inputs.code_git {record.inputs.code_git} is not the checked-out HEAD {state['head']}")
+    if state["dirty"]:
+        policy = dirty_source or os.environ.get("LEMMA_DIRTY_SOURCE", "reject")
+        if policy != "snapshot":
+            raise DirtySourceError(
+                "source differs from the recorded commit; commit first, or seal the exact bytes with "
+                f"LEMMA_DIRTY_SOURCE=snapshot: {', '.join(state['changed'])}")
+        record.inputs.source_snapshot_cid = source_snapshot(state["changed"])
+        record.inputs.code_git_dirty = True
     record.started = record.started or now_iso()
     append(record)
     return record
@@ -118,12 +216,22 @@ def read_ledger() -> list[RunRecord]:
 
 
 def citable(run_id: str) -> RunRecord:
-    """Return the sealed record for run_id iff its metrics resolve in the store."""
+    """Return the sealed record for run_id iff its metrics resolve in the store,
+    hash to their CID, and name this run (lemma #7)."""
     sealed = [r for r in read_ledger() if r.run_id == run_id and r.status == "completed"]
     if not sealed:
         raise LedgerError(f"run {run_id} has no completed ledger line")
     rec = sealed[-1]
     if not rec.metrics_cid:
         raise LedgerError(f"run {run_id} completed without a metrics_cid — not citable")
-    ket_get(rec.metrics_cid)  # raises if the evidence does not resolve
+    data = ket_get_verified(rec.metrics_cid)  # bytes must resolve AND hash to the CID
+    try:
+        envelope = json.loads(data)
+    except ValueError as e:
+        raise LedgerError(f"run {run_id}: metrics {rec.metrics_cid} is not JSON: {e}") from e
+    if not isinstance(envelope, dict) or "metrics" not in envelope:
+        raise LedgerError(f"run {run_id}: metrics {rec.metrics_cid} is not a metrics envelope")
+    if envelope.get("run_id") != run_id:
+        raise LedgerError(
+            f"run {run_id}: metrics {rec.metrics_cid} belongs to run {envelope.get('run_id')!r}")
     return rec
