@@ -130,3 +130,18 @@ def test_trained_split_refuses_a_manifest_that_does_not_cover_the_corpus(tmp_pat
     rows.append(decl("new", "Mathlib.New.A", "newlock"))
     with pytest.raises(CorpusError, match="not in the split manifest"):
         trained_split(path, None, rows)
+
+
+def test_module_split_across_splits_is_disclosed():
+    # a pre-#6 manifest can put one module's rows in two splits while keeping
+    # every lock inside one split; the pool stats must say so
+    rows = fixture_rows()
+    assign = splits.assign(rows)
+    test_mod = next(r.module for r in rows if assign[r.name] == "test")
+    _, _, clean = heldout_pool(rows, assign, 1000, 1000, random.Random(0))
+    assert clean["modules_shared_with_other_splits"] == 0
+    rows.append(decl("same-module-train", test_mod, "own-lock"))
+    assign["same-module-train"] = "train"
+    _, _, stats = heldout_pool(rows, assign, 1000, 1000, random.Random(0))
+    assert stats["modules_shared_with_other_splits"] == 1
+    assert stats["modules_in_split"] == clean["modules_in_split"]

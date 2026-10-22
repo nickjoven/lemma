@@ -51,6 +51,14 @@ def main() -> int:
 
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     cache = CachedStatements(REPO_ROOT / cfg["cache_dir"], cfg["cache_name"])
+    # the split this checkpoint trains against, by CID: evaluate_s2 refuses any
+    # other manifest for a held-out claim (lemma #5); without this the check
+    # has nothing to compare against and the binding is the cache report only
+    split_manifest = REPO_ROOT / cfg["cache_dir"] / "split-manifest.json"
+    if not split_manifest.is_file():
+        raise SystemExit(f"{split_manifest} is missing: a cache without its split manifest "
+                         "cannot support a later held-out evaluation")
+    split_manifest_cid = ledger.ket_put(split_manifest.read_bytes())
     enc_cfg = EncoderConfig(vocab_size=tok.get_vocab_size(), **cfg.get("encoder", {}))
     model = Encoder(enc_cfg).to(device)
     head = MLMHead(model).to(device)
@@ -69,6 +77,7 @@ def main() -> int:
         run_id=run_id, kind="train", stage="S2", started=ledger.now_iso(),
         inputs=ledger.RunInputs(
             corpus_cids=cfg.get("corpus_cids", []),
+            split_manifest_cid=split_manifest_cid,
             tokenizer_cid=cfg.get("tokenizer_cid"),
             config_cid=config_cid, code_git=ledger.git_head(),
             mathlib_pin=cfg["mathlib_pin"]),

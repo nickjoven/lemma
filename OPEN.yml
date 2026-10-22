@@ -205,9 +205,19 @@
     no split filter, while the README said "held-out modules". The recorded
     number stands as full-corpus duplicate retrieval and its evidence is kept;
     the README is qualified. A renewed held-out claim needs a new sealed run
-    of the corrected evaluator (github issue #5).
+    of the corrected evaluator (github issue #5). Two limits on that rerun
+    for s2-mlm-20260909-141736: its train record has no split_manifest_cid
+    (train.py did not record one until #10), so the manifest is tied to the
+    checkpoint only by the cache report's per-split counts, and the eval
+    records split_manifest_binding = cache_report_counts_only; and its
+    manifest was built under the pre-#6 rule, which keeps locks inside a
+    split but can split a module, so its test split is held out by
+    declaration and lock, not by whole module (the eval records
+    modules_shared_with_other_splits). A "held-out modules" claim needs a
+    checkpoint trained on a component-rule manifest (L-12).
   fix: seal a new s2-eval run on the test split; report the margin over the
-    exact-text baseline as the learned part.
+    exact-text baseline as the learned part, and state the binding and the
+    module overlap with the number.
 - id: L-10
   severity: high
   status: fix-pending (start_run now refuses a source tree that differs from code_git, or seals the exact changed bytes under LEMMA_DIRTY_SOURCE=snapshot)

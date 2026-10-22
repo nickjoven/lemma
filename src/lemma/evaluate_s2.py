@@ -100,6 +100,11 @@ def heldout_pool(rows, assign: dict[str, str], n_groups: int, n_distractors: int
     cannot happen, so it is checked rather than trusted."""
     in_split = [r for r in rows if assign.get(r.name) == split]
     outside_locks = {r.lock for r in rows if assign.get(r.name) != split}
+    # disclosed, not refused: a manifest built under the pre-#6 rule keeps locks
+    # inside a split but can split a module, so its test split is held out by
+    # declaration and lock, not by whole module; this count says how far
+    outside_modules = {r.module for r in rows if assign.get(r.name) != split}
+    shared_modules = {r.module for r in in_split} & outside_modules
     by_lock: dict[str, list] = defaultdict(list)
     for r in in_split:
         by_lock[r.lock].append(r)
@@ -117,6 +122,8 @@ def heldout_pool(rows, assign: dict[str, str], n_groups: int, n_distractors: int
     distractors = rng.sample(candidates, min(n_distractors, len(candidates)))
     stats = {"split": split, "rows_in_split": len(in_split), "groups_available": len(by_lock),
              "duplicate_groups_available": n_duplicate_groups,
+             "modules_in_split": len({r.module for r in in_split}),
+             "modules_shared_with_other_splits": len(shared_modules),
              "groups": len(groups), "queries": len(members), "distractors": len(distractors),
              "query_names_cid": None, "pool_names_cid": None}
     return members, distractors, stats
@@ -177,6 +184,11 @@ def main() -> int:
     modules = [r.module for r in pool]
     # the identities behind every number, sealed: which statements were asked and offered
     pool_stats["split_manifest_cid"] = split_manifest_cid
+    # how the manifest is tied to the checkpoint: by the CID the train run recorded,
+    # or (runs trained before train.py recorded one) only by the cache report's
+    # per-split counts, which a rebuilt cache would also satisfy
+    pool_stats["split_manifest_binding"] = ("train_record_cid" if train_rec.inputs.split_manifest_cid
+                                            else "cache_report_counts_only")
     pool_stats["split_rule"] = split_rule
     pool_stats["query_names_cid"] = ledger.ket_put_json([r.name for r in members])
     pool_stats["pool_names_cid"] = ledger.ket_put_json([r.name for r in pool])
