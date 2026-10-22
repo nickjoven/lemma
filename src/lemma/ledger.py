@@ -16,10 +16,10 @@ import json
 import os
 import subprocess
 import time
-
-import blake3
 from datetime import datetime, timezone
 from pathlib import Path
+
+import blake3
 
 from .schemas import RunInputs, RunRecord  # re-exported for callers (train.py uses ledger.RunInputs)
 
