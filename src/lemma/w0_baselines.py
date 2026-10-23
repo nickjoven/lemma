@@ -40,8 +40,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data import splits
-from .data.corpus import iter_goals, iter_rows, iter_transitions
+from .data import split_binding, splits
+from .data.corpus import iter_goals, iter_transitions
 from .train_s3 import load_s2_encoder, tokenize
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -138,9 +138,9 @@ def main() -> int:
 
     goals = {g.lock: g.readable for g in iter_goals()}
     rows = list(iter_transitions())
-    decl_rows = list(iter_rows("declarations", verify=False))
-    assign = splits.assign(decl_rows)
-    split_of = splits.assign_transitions(rows, assign)
+    # the split the S2 encoder trained against, as the W0 model on top of it will (review of #10)
+    _, binding = split_binding.resolve_corpus(s2_rec)
+    split_of = splits.assign_transitions(rows, binding.assignment)
     steps = [(i, t) for i, t in enumerate(single_step_rows(rows)) if t.goal_before in goals and t.goal_after[0] in goals]
     # re-index split by original row identity
     row_index = {id(t): i for i, t in enumerate(rows)}
@@ -158,7 +158,7 @@ def main() -> int:
     off = offsets_by_tactic(zb_tr, za_tr, [t.tactic for t in train]) if train else {}
     zb_te, za_te = emb_pair(test)
     tgt = np.arange(len(test))
-    results = {"n_train_steps": len(train), "n_test_steps": len(test)}
+    results = {"split": binding.disclosure(), "n_train_steps": len(train), "n_test_steps": len(test)}
     if test:
         pred_off = np.stack([zb_te[i] + off.get(t.tactic, {"mu": np.zeros(zb_te.shape[1])})["mu"] for i, t in enumerate(test)])
         results["mrr_identity"] = round(mrr(zb_te, za_te, tgt), 4)
@@ -201,7 +201,7 @@ def main() -> int:
         run_id=f"w0-baselines-{time.strftime('%Y%m%d-%H%M%S')}", kind="eval", stage="W0", started=ledger.now_iso(),
         inputs=ledger.RunInputs(corpus_cids=s2_rec.inputs.corpus_cids, tokenizer_cid=s2_rec.inputs.tokenizer_cid,
                                 config_cid=cfg_cid, init_checkpoint_cid=s2_rec.checkpoint_cids[-1],
-                                code_git=ledger.git_head(), mathlib_pin=s2_rec.inputs.mathlib_pin),
+                                split_manifest_cid=binding.certificate_cid, code_git=ledger.git_head(), mathlib_pin=s2_rec.inputs.mathlib_pin),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
     ledger.start_run(rec, preflight=src_state)
     ledger.finish_run(rec, results, started_monotonic=t0)

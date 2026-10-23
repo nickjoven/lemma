@@ -54,7 +54,7 @@ def main() -> int:
     train_rec = ledger.citable(args.run)
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    data, classes, audit = load_labelled(cfg)
+    data, classes, audit, binding = load_labelled(cfg, train_rec)   # the split this run trained against
     model = VerdictModelV2(Encoder(EncoderConfig(vocab_size=tok.get_vocab_size(), max_seq=cfg["max_seq"])), len(classes))
     model.load_state_dict(load_file(str(REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors")))
     model = model.to(device).eval()
@@ -86,6 +86,7 @@ def main() -> int:
     thin = [c for c, v in per_class.items() if v["support"] < 30]
 
     metrics = {
+        "split": binding.disclosure(),
         "classes": classes, "test_rows_iid": len(test_iid), "test_rows_ood": len(test_ood), "ood_operator": ood,
         "test_class_counts": dict(Counter(t[3] for t in test_iid)),
         "macro_f1": round(f1, 4), "accuracy": round(acc, 4), "per_class": per_class,
@@ -108,7 +109,7 @@ def main() -> int:
         run_id=f"s4v2-eval-{args.run}", kind="eval", stage="S4", started=ledger.now_iso(),
         inputs=ledger.RunInputs(corpus_cids=train_rec.inputs.corpus_cids, tokenizer_cid=train_rec.inputs.tokenizer_cid,
                                 config_cid=train_rec.inputs.config_cid, init_checkpoint_cid=train_rec.checkpoint_cids[-1],
-                                code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
+                                split_manifest_cid=binding.certificate_cid, code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
     ledger.start_run(rec, preflight=src_state)
     rec.calibration_record_cid = ledger.ket_put_json(calib)

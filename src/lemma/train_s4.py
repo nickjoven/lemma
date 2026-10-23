@@ -30,8 +30,8 @@ from sklearn.metrics import f1_score
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data import splits
-from .data.corpus import iter_mutants, iter_rows
+from .data import split_binding, splits
+from .data.corpus import iter_mutants
 from .models.encoder import Encoder
 from .models.heads import ClassifierHead
 from .train_s3 import load_s2_encoder, tokenize
@@ -58,11 +58,13 @@ class VerdictModel(nn.Module):
         return self.head_elab(z), self.head_op(z)
 
 
-def mutants_by_split(ood_operator: str | None):
-    """split -> [(text, elab, op_idx, op_class)]; mutants inherit the parent's split.
-    The ood_operator class is removed from train/val and kept only in test."""
-    rows = list(iter_rows("declarations", verify=False))
-    assign = splits.assign(rows)
+def mutants_by_split(ood_operator: str | None, run):
+    """(split -> [(text, elab, op_idx, op_class)], Binding); mutants inherit the
+    parent's split under the split `run` trained against (split_binding.resolve;
+    for training, the S2 init run). The ood_operator class is removed from
+    train/val and kept only in test."""
+    _, binding = split_binding.resolve_corpus(run)
+    assign = binding.assignment
     out = {s: [] for s in splits.SPLITS}
     for m in iter_mutants():
         s = assign.get(m.parent_name)
@@ -74,7 +76,7 @@ def mutants_by_split(ood_operator: str | None):
         if ood_operator and oc == ood_operator and s != "test":
             continue
         out[s].append((m.mutated_type, int(m.elaborates), OP_CLASSES.index(oc), oc))
-    return out
+    return out, binding
 
 
 @torch.no_grad()
@@ -113,7 +115,7 @@ def main() -> int:
     model = VerdictModel(enc).to(device)
     pad = enc.cfg.pad_id
 
-    data = mutants_by_split(cfg.get("ood_operator"))
+    data, binding = mutants_by_split(cfg.get("ood_operator"), s2_rec)   # inherit the init checkpoint's split
     train, val = data["train"], data["val"]
     n_pos = sum(t[1] for t in train)
     w = torch.tensor([len(train) / max(len(train) - n_pos, 1), len(train) / max(n_pos, 1)], device=device)
@@ -129,7 +131,7 @@ def main() -> int:
         run_id=run_id, kind="train", stage="S4", started=ledger.now_iso(),
         inputs=ledger.RunInputs(corpus_cids=[*s2_rec.inputs.corpus_cids, *cfg.get("mutant_corpus_cids", [])],
                                 tokenizer_cid=s2_rec.inputs.tokenizer_cid, config_cid=config_cid,
-                                init_checkpoint_cid=s2_rec.checkpoint_cids[-1],
+                                init_checkpoint_cid=s2_rec.checkpoint_cids[-1], split_manifest_cid=binding.certificate_cid, 
                                 code_git=ledger.git_head(), mathlib_pin=s2_rec.inputs.mathlib_pin),
         seed=cfg.get("seed", 1337),
         hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu", "torch": torch.__version__}), preflight=src_state)

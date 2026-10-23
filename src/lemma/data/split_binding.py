@@ -105,3 +105,10 @@ def resolve(run: ledger.RunRecord, rows, *, expect_rule: str | None = None,
     cid = put_certificate(splits.certificate(assignment, rule))
     return Binding(assignment, rule, cid, "pinned_rule_reconstructed",
                    f"configs/{pins_path.name}" if pinned is not None else "explicit")
+
+
+def resolve_corpus(run: ledger.RunRecord, *, expect_rule: str | None = None):
+    """(rows, Binding) over the declarations corpus, in iter_rows order."""
+    from .corpus import iter_rows
+    rows = list(iter_rows("declarations", verify=False))
+    return rows, resolve(run, rows, expect_rule=expect_rule)

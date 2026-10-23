@@ -30,11 +30,10 @@ from sklearn.metrics import roc_auc_score
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data import splits
-from .data.corpus import encoder_text, iter_rows
+from .data.corpus import encoder_text
 from .models.encoder import Encoder, EncoderConfig
 from .train_s3 import tokenize
-from .train_s5 import EquivModel, equivalence_pairs_by_split
+from .train_s5 import EquivModel, equivalence_pairs_for
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MRR_GATE = 0.5
@@ -68,11 +67,11 @@ def main() -> int:
     model.load_state_dict(load_file(str(REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors")))
     model = model.to(device).eval()
 
-    test = equivalence_pairs_by_split()["test"]
+    by_split, rows, binding = equivalence_pairs_for(train_rec)   # the split this run trained against (review of #10)
+    test = by_split["test"]
     iff = [p for p in test if p[3] == "iff"]
     dedup = [p for p in test if p[3] == "dedup"]
-    rows = list(iter_rows("declarations", verify=False))
-    assign = splits.assign(rows)
+    assign = binding.assignment
     test_rows = [r for r in rows if assign[r.name] == "test"]
     distractor_rows = rng.sample(test_rows, min(args.distractors, len(test_rows)))
     t0 = time.monotonic()
@@ -131,6 +130,7 @@ def main() -> int:
     prop_cid = ledger.ket_put(prop_path.read_bytes())
 
     metrics = {
+        "split": binding.disclosure(),
         "test_iff": len(iff), "distractors": len(distractor_rows),
         "iff_mrr": round(mrr, 4), "iff_recall@1": round(r1, 4), "iff_recall@10": round(r10, 4),
         "dedup_mrr": round(dd_mrr, 4) if dd_mrr == dd_mrr else None,
@@ -149,7 +149,7 @@ def main() -> int:
         run_id=f"s5-eval-{args.run}", kind="eval", stage="S5", started=ledger.now_iso(),
         inputs=ledger.RunInputs(corpus_cids=train_rec.inputs.corpus_cids, tokenizer_cid=train_rec.inputs.tokenizer_cid,
                                 config_cid=train_rec.inputs.config_cid, init_checkpoint_cid=train_rec.checkpoint_cids[-1],
-                                code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
+                                split_manifest_cid=binding.certificate_cid, code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
     ledger.start_run(rec, preflight=src_state)
     rec.calibration_record_cid = ledger.ket_put_json(calib)

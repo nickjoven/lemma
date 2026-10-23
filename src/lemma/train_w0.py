@@ -39,8 +39,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data import splits
-from .data.corpus import iter_goals, iter_rows, iter_transitions
+from .data import split_binding, splits
+from .data.corpus import iter_goals, iter_transitions
 from .models.encoder import Encoder, EncoderConfig
 from .train_s3 import load_s2_encoder, tokenize
 from .w0_baselines import mrr, offsets_by_tactic, single_step_rows
@@ -99,11 +99,14 @@ def tobit_nll(mu, log_sigma, y, censored):
     return torch.where(censored, surv, nll_obs).mean()
 
 
-def load_data(cfg: dict):
+def load_data(cfg: dict, run):
+    """(data by split, tactics, Binding): transitions inherit the demonstrandum's
+    split under the split `run` trained against (split_binding.resolve; for
+    training, the S2 init run), never a fresh assignment (review of #10)."""
     goals = {g.lock: g.readable for g in iter_goals(cfg.get("goals_corpus", "goals"))}
     rows = [t for t in iter_transitions(cfg.get("transitions_corpus", "transitions")) if t.kind == "rung"]
-    assign = splits.assign(list(iter_rows("declarations", verify=False)))
-    sp = splits.assign_transitions(rows, assign)
+    _, binding = split_binding.resolve_corpus(run)
+    sp = splits.assign_transitions(rows, binding.assignment)
     data = {s: [] for s in splits.SPLITS}
     for i, t in enumerate(rows):
         s = sp.get(i)
@@ -116,7 +119,7 @@ def load_data(cfg: dict):
                         "logcost": math.log(max(t.heartbeats, 1)) if not t.censored else math.log(max(t.heartbeat_cap, 1)),
                         "censored": t.censored, "before_lock": t.goal_before, "after_lock": after})
     tactics = sorted({r["tactic"] for r in data["train"]})
-    return data, tactics
+    return data, tactics, binding
 
 
 @torch.no_grad()
@@ -153,7 +156,7 @@ def train(args) -> int:
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     s2_rec = ledger.citable(cfg["s2_run"])
     enc = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors", tok.get_vocab_size(), cfg["max_seq"])
-    data, tactics = load_data(cfg)
+    data, tactics, binding = load_data(cfg, s2_rec)   # inherit the init checkpoint's split
     train_rows, val_rows = data["train"], data["val"]
     train_single = [r for r in train_rows if r["single"]]
     val_single = [r for r in val_rows if r["single"]]
@@ -176,6 +179,7 @@ def train(args) -> int:
         inputs=ledger.RunInputs(corpus_cids=[*s2_rec.inputs.corpus_cids, *cfg.get("transitions_corpus_cids", [])],
                                 tokenizer_cid=s2_rec.inputs.tokenizer_cid, config_cid=config_cid,
                                 init_checkpoint_cid=s2_rec.checkpoint_cids[-1], code_git=ledger.git_head(),
+                                split_manifest_cid=binding.certificate_cid,
                                 mathlib_pin=s2_rec.inputs.mathlib_pin),
         seed=cfg.get("seed", 1337), hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu", "torch": torch.__version__}), preflight=src_state)
     t0 = time.monotonic()
@@ -270,7 +274,7 @@ def evaluate(args) -> int:
     target = target.to(device).eval()
     s2 = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors", tok.get_vocab_size(), cfg["max_seq"]).to(device).eval()
 
-    data, _ = load_data(cfg)
+    data, _, binding = load_data(cfg, train_rec)   # the split this W0 run trained against
     test = data["test"]
     single = [r for r in test if r["single"]]
     if len(single) > args.max_candidates:
@@ -314,7 +318,7 @@ def evaluate(args) -> int:
     mae_unc = float(np.abs(c[~cens, 0] - y_cost[~cens]).mean()) if (~cens).any() else None
     cens_cal = float((c[cens, 0] >= y_cost[cens]).mean()) if cens.any() else None
     bar = max(m_off, m_lex) + 0.10
-    metrics = {"test_single_step": len(single), "test_rows": len(test), "outcome_support": support,
+    metrics = {"split": binding.disclosure(), "test_single_step": len(single), "test_rows": len(test), "outcome_support": support,
                "mrr_w0": round(m_w0, 4), "mrr_identity": round(m_id, 4), "mrr_offset": round(m_off, 4),
                "mrr_lexical": round(m_lex, 4), "mrr_w0_permuted": round(m_perm, 4), "gate_bar": round(bar, 4),
                "pass_retrieval": m_w0 >= bar, "per_tactic": per_tac,
@@ -329,7 +333,7 @@ def evaluate(args) -> int:
     rec = ledger.RunRecord(run_id=f"w0-eval-{args.run}", kind="eval", stage="W0", started=ledger.now_iso(),
                            inputs=ledger.RunInputs(corpus_cids=train_rec.inputs.corpus_cids, tokenizer_cid=train_rec.inputs.tokenizer_cid,
                                                    config_cid=train_rec.inputs.config_cid, init_checkpoint_cid=train_rec.checkpoint_cids[0],
-                                                   code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
+                                                   split_manifest_cid=binding.certificate_cid, code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
                            seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
     ledger.start_run(rec, preflight=src_state)
     rec.calibration_record_cid = ledger.ket_put_json(calib)

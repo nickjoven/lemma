@@ -2,8 +2,10 @@
 
 Shared encoder (warm-started from the S2 checkpoint) with two projection
 heads, trained with symmetric InfoNCE over (docstring, readable statement)
-pairs drawn from the declarations corpus. Splits are the module-level
-leakage-safe assignment, so eval glosses come from held-out modules.
+pairs drawn from the declarations corpus. The split is the one the S2
+init checkpoint trained against (split_binding.resolve), never a fresh
+assignment: a test gloss whose statement the encoder saw in S2 pretraining
+is not held out. The run records that split's certificate.
 
     uv run python -u -m lemma.train_s3 --config configs/s3_gloss.yaml
 """
@@ -23,8 +25,8 @@ from safetensors.torch import load_file, save_file
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data import splits
-from .data.corpus import encoder_text, iter_rows
+from .data import split_binding, splits
+from .data.corpus import encoder_text
 from .models.encoder import Encoder, EncoderConfig
 from .models.heads import ProjectionHead
 from .objectives.contrastive import in_batch_accuracy, info_nce
@@ -54,11 +56,9 @@ def load_s2_encoder(ckpt: Path, vocab_size: int, max_seq: int) -> Encoder:
     return enc
 
 
-def gloss_pairs_by_split() -> dict[str, list[tuple[str, str, str]]]:
-    """split -> [(docstring, statement, module)] for declarations with a docstring.
-    One corpus pass for all splits (the pass is the expensive part)."""
-    rows = list(iter_rows("declarations", verify=False))
-    assign = splits.assign(rows)
+def gloss_pairs_by_split(rows, assign: dict[str, str]) -> dict[str, list[tuple[str, str, str]]]:
+    """split -> [(docstring, statement, module)] for declarations with a docstring,
+    under `assign` (a split_binding.resolve result, never a fresh assignment)."""
     out: dict[str, list] = {s: [] for s in splits.SPLITS}
     for r in rows:
         if r.docstring:
@@ -66,8 +66,10 @@ def gloss_pairs_by_split() -> dict[str, list[tuple[str, str, str]]]:
     return out
 
 
-def gloss_pairs(split: str) -> list[tuple[str, str, str]]:
-    return gloss_pairs_by_split()[split]
+def gloss_pairs(split: str, run) -> tuple[list[tuple[str, str, str]], "split_binding.Binding"]:
+    """The `split` gloss pairs under the split `run` trained against."""
+    rows, binding = split_binding.resolve_corpus(run)
+    return gloss_pairs_by_split(rows, binding.assignment)[split], binding
 
 
 def module_index(pairs: list[tuple[str, str, str]]) -> dict[str, list[int]]:
@@ -154,7 +156,8 @@ def main() -> int:
     model = GlossModel(enc, cfg.get("proj_dim", 256)).to(device)
     pad = enc.cfg.pad_id
 
-    by_split = gloss_pairs_by_split()
+    rows, binding = split_binding.resolve_corpus(s2_rec)   # inherit the init checkpoint's split
+    by_split = gloss_pairs_by_split(rows, binding.assignment)
     train = by_split["train"]
     prng = random.Random(cfg.get("seed", 1337))
     val = prng.sample(by_split["val"], min(cfg.get("val_pairs", 1500), len(by_split["val"])))
@@ -172,7 +175,7 @@ def main() -> int:
         inputs=ledger.RunInputs(corpus_cids=s2_rec.inputs.corpus_cids,
                                 tokenizer_cid=s2_rec.inputs.tokenizer_cid,
                                 config_cid=config_cid,
-                                init_checkpoint_cid=s2_rec.checkpoint_cids[-1],
+                                init_checkpoint_cid=s2_rec.checkpoint_cids[-1], split_manifest_cid=binding.certificate_cid, 
                                 code_git=ledger.git_head(), mathlib_pin=s2_rec.inputs.mathlib_pin),
         seed=cfg.get("seed", 1337),
         hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu",

@@ -30,8 +30,8 @@ from safetensors.torch import save_file
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data import splits
-from .data.corpus import iter_attempts, iter_mutants, iter_rows
+from .data import split_binding, splits
+from .data.corpus import iter_attempts, iter_mutants
 from .data.labels import collapse_rule, join_mutant_attempts
 from .models.encoder import Encoder
 from .models.heads import ClassifierHead
@@ -66,18 +66,21 @@ def labelled_by_split(rows: list[dict], assign: dict[str, str], classes: list[st
     return out
 
 
-def load_labelled(cfg: dict) -> tuple[dict[str, list[tuple]], list[str], dict]:
-    """-> (by_split, classes, audit). Every filter applied here is recorded in the audit."""
+def load_labelled(cfg: dict, run) -> tuple[dict[str, list[tuple]], list[str], dict, "split_binding.Binding"]:
+    """-> (by_split, classes, audit, binding). Every filter applied here is
+    recorded in the audit. The split is the one `run` trained against
+    (split_binding.resolve; for training, the S2 init run)."""
     prover = cfg.get("prover")
     attempts = [a for a in iter_attempts(cfg.get("attempts_corpus", "attempts"))
                 if not prover or a.prover == prover]
     rows, audit = join_mutant_attempts(iter_mutants(), attempts)
     classes, support = collapse_rule(rows, min_support=int(cfg.get("min_support", 30)))
-    decl_rows = list(iter_rows("declarations", verify=False))
-    data = labelled_by_split(rows, splits.assign(decl_rows), classes, cfg.get("ood_operator"))
+    _, binding = split_binding.resolve_corpus(run)
+    data = labelled_by_split(rows, binding.assignment, classes, cfg.get("ood_operator"))
     audit.update({"attempts_considered": len(attempts), "prover_filter": prover, "classes": classes,
-                  "support3": support, "per_split": {s: len(v) for s, v in data.items()}})
-    return data, classes, audit
+                  "support3": support, "per_split": {s: len(v) for s, v in data.items()},
+                  "split": binding.disclosure()})
+    return data, classes, audit, binding
 
 
 @torch.no_grad()
@@ -109,7 +112,7 @@ def main() -> int:
     enc = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors",
                           tok.get_vocab_size(), cfg["max_seq"])
 
-    data, classes, audit = load_labelled(cfg)
+    data, classes, audit, binding = load_labelled(cfg, s2_rec)   # inherit the init checkpoint's split
     train, val = data["train"], data["val"]
     if not train or not val:
         raise SystemExit(f"S4 v2: empty split ({audit['per_split']}); nothing to train on")
@@ -130,7 +133,7 @@ def main() -> int:
         inputs=ledger.RunInputs(corpus_cids=[*s2_rec.inputs.corpus_cids, *cfg.get("mutant_corpus_cids", []),
                                              *cfg.get("attempts_corpus_cids", [])],
                                 tokenizer_cid=s2_rec.inputs.tokenizer_cid, config_cid=config_cid,
-                                init_checkpoint_cid=s2_rec.checkpoint_cids[-1],
+                                init_checkpoint_cid=s2_rec.checkpoint_cids[-1], split_manifest_cid=binding.certificate_cid, 
                                 code_git=ledger.git_head(), mathlib_pin=s2_rec.inputs.mathlib_pin),
         seed=cfg.get("seed", 1337),
         hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu", "torch": torch.__version__}), preflight=src_state)

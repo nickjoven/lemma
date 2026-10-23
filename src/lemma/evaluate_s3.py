@@ -66,7 +66,7 @@ def main() -> int:
     model.load_state_dict(load_file(str(REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors")))
     model = model.to(device).eval()
 
-    test = gloss_pairs("test")
+    test, binding = gloss_pairs("test", train_rec)   # the split this run trained against (review of #10)
     glosses = [t[0] for t in test]
     stmts = [t[1] for t in test]
     mods = [t[2] for t in test]
@@ -126,6 +126,7 @@ def main() -> int:
         "permutation_auc": round(auc_perm, 4),
         "hard_auc_gate": HARD_AUC_GATE, "pass_hard_auc": auc_hard >= HARD_AUC_GATE,
         "deferred": "docstring x gate-verified mutant AUC (needs Phase-3 mutant corpus)",
+        "split": binding.disclosure(),
     }
     calib = {"pass": metrics["pass_hard_auc"] and 0.45 <= auc_perm <= 0.55,
              "controls": [
@@ -138,7 +139,7 @@ def main() -> int:
         inputs=ledger.RunInputs(corpus_cids=train_rec.inputs.corpus_cids,
                                 tokenizer_cid=train_rec.inputs.tokenizer_cid,
                                 config_cid=train_rec.inputs.config_cid,
-                                init_checkpoint_cid=train_rec.checkpoint_cids[-1],
+                                init_checkpoint_cid=train_rec.checkpoint_cids[-1], split_manifest_cid=binding.certificate_cid, 
                                 code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
     ledger.start_run(rec, preflight=src_state)
