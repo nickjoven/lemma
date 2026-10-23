@@ -142,15 +142,49 @@ def same_lock_mrr(sims: torch.Tensor, locks: list[str], n_queries: int) -> tuple
     return float(np.mean(rr)), float(np.mean([r == 1.0 for r in rr]))
 
 
-def exact_text_mrr(texts: list[str], locks: list[str], n_queries: int) -> float:
-    """What string equality alone retrieves: a query scores 1 if another
-    same-lock statement has byte-identical encoder text, else 0. If this is
-    close to the model's MRR the task is duplicate detection, not semantics."""
-    hits = []
+def expected_rr_first_of(m: int, k: int, offset: int = 0) -> float:
+    """E[1 / (offset + R)] where R is the position of the first of k marked
+    items in a uniformly random order of m items (1 <= k <= m). Exact:
+    P(R = 1) = k/m and P(R = r+1) / P(R = r) = (m - r - k + 1) / (m - r)."""
+    r = np.arange(1, m - k + 2, dtype=np.float64)
+    ratios = (m - r[:-1] - k + 1) / (m - r[:-1])
+    p = np.concatenate([[k / m], (k / m) * np.cumprod(ratios)])
+    return float(np.sum(p / (offset + r)))
+
+
+def exact_text_mrr(texts: list[str], locks: list[str], n_queries: int) -> tuple[float, float]:
+    """What string equality alone retrieves, as a REAL ranked MRR comparable
+    to same_lock_mrr, plus its hit rate. Returns (mrr, hit_rate).
+
+    The string-equality retriever scores every other pool row 1 if its encoder
+    text is byte-identical to the query's, else 0, and ranks by that score.
+    Tie policy: ties are broken uniformly at random, and the reported
+    reciprocal rank is its exact expectation over that tie-break (no sampling).
+    So identical-text rows of a DIFFERENT lock compete with the same-lock
+    match inside the score-1 block, and a query with no identical same-lock
+    text gets the expected reciprocal rank of its first same-lock row inside
+    the score-0 block, after every score-1 row. The earlier version was a
+    binary any-identical-same-lock indicator (now `hit_rate`), which ignored
+    different-lock identical texts and was not an MRR, so subtracting it from
+    the model's MRR was not a margin over a baseline (review of #10)."""
+    text_ids = np.unique(np.asarray(texts, dtype=object), return_inverse=True)[1]
+    lock_ids = np.unique(np.asarray(locks, dtype=object), return_inverse=True)[1]
+    n = len(texts)
+    rr, hits = [], []
     for i in range(n_queries):
-        hits.append(1.0 if any(j != i and locks[j] == locks[i] and texts[j] == texts[i]
-                               for j in range(len(texts))) else 0.0)
-    return float(np.mean(hits))
+        other = np.ones(n, dtype=bool)
+        other[i] = False
+        eq = other & (text_ids == text_ids[i])
+        same = other & (lock_ids == lock_ids[i])
+        m_eq, k_eq = int(eq.sum()), int((eq & same).sum())
+        hits.append(1.0 if k_eq else 0.0)
+        if k_eq:
+            rr.append(expected_rr_first_of(m_eq, k_eq))
+        else:
+            rest = other & ~eq
+            k_rest = int((rest & same).sum())
+            rr.append(expected_rr_first_of(int(rest.sum()), k_rest, offset=m_eq) if k_rest else 0.0)
+    return float(np.mean(rr)), float(np.mean(hits))
 
 
 def main() -> int:
@@ -202,7 +236,7 @@ def main() -> int:
     mrr, hit1 = same_lock_mrr(sims, locks, len(members))
 
     # baselines on the SAME pool: string equality, and an untrained encoder of the same shape
-    exact_mrr = exact_text_mrr(texts, locks, len(members))
+    exact_mrr, exact_hit = exact_text_mrr(texts, locks, len(members))
     torch.manual_seed(args.seed)
     untrained = Encoder(EncoderConfig(vocab_size=tok.get_vocab_size())).to(device).eval()
     Zu = embed(untrained, tok, texts, device)
@@ -232,7 +266,10 @@ def main() -> int:
         "same_lock_mrr": round(mrr, 4), "same_lock_hit@1": round(hit1, 4),
         "queries": len(members), "pool": len(pool), "groups": groups,
         "heldout": pool_stats,
+        # both MRRs over the same pool and queries; exact-text ties broken uniformly at random (exact expectation)
         "same_lock_mrr_exact_text_baseline": round(exact_mrr, 4),
+        "exact_text_hit_rate": round(exact_hit, 4),
+        "exact_text_tie_policy": "uniform random tie-break, exact expected reciprocal rank",
         "same_lock_mrr_untrained_encoder": round(untrained_mrr, 4),
         "same_lock_mrr_margin_over_exact_text": round(mrr - exact_mrr, 4),
         "neg_cross_module_top1_rate": round(neg_rate, 4),

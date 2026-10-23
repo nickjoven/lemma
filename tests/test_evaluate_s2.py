@@ -69,8 +69,39 @@ def test_mrr_helpers():
     sims = torch.tensor([[-1.0, 0.9, 0.1], [0.9, -1.0, 0.1], [0.5, 0.2, -1.0]])
     mrr, hit1 = same_lock_mrr(sims, locks, 2)
     assert mrr == 1.0 and hit1 == 1.0
-    assert exact_text_mrr(["s", "s", "t"], locks, 2) == 1.0
-    assert exact_text_mrr(["s", "s2", "t"], locks, 2) == 0.0
+    assert exact_text_mrr(["s", "s", "t"], locks, 2) == (1.0, 1.0)
+    # no identical text: the same-lock row is found in the score-0 block, rank 1 or 2 at random
+    mrr0, hit0 = exact_text_mrr(["s", "s2", "t"], locks, 2)
+    assert hit0 == 0.0 and mrr0 == pytest.approx(0.75)
+
+
+def _brute_force_exact_text_mrr(texts, locks, n_queries):
+    """Average the reciprocal rank over EVERY tie-break order."""
+    import itertools
+    out = []
+    for i in range(n_queries):
+        cands = [j for j in range(len(texts)) if j != i]
+        rrs = []
+        for order in itertools.permutations(cands):
+            ranked = sorted(order, key=lambda j: texts[j] != texts[i])   # stable: score-1 block first
+            rrs.append(next(1 / (r + 1) for r, j in enumerate(ranked) if locks[j] == locks[i]))
+        out.append(sum(rrs) / len(rrs))
+    return sum(out) / len(out)
+
+
+def test_exact_text_mrr_is_a_ranked_mrr_and_counts_different_lock_twins():
+    # query 0 has a same-lock identical twin (1) AND two different-lock rows with the same text (2, 3):
+    # string equality cannot tell them apart, so its expected rank is not 1
+    texts = ["s", "s", "s", "s", "u", "v"]
+    locks = ["x", "x", "y", "z", "w", "x"]
+    mrr, hit = exact_text_mrr(texts, locks, 2)
+    assert hit == 1.0
+    assert mrr < 1.0, "the binary indicator called this 1.0; a ranked MRR must not"
+    assert mrr == pytest.approx(_brute_force_exact_text_mrr(texts, locks, 2))
+    # a query whose only same-lock rows have different text ranks behind every identical-text row
+    texts2 = ["s", "t", "s", "s", "u"]
+    locks2 = ["x", "x", "y", "z", "w"]
+    assert exact_text_mrr(texts2, locks2, 1)[0] == pytest.approx(_brute_force_exact_text_mrr(texts2, locks2, 1))
 
 
 def test_duplicate_groups_available_is_counted_before_truncation():
