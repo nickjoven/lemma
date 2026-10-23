@@ -11,9 +11,12 @@ Rules (in force for every stage):
   4. Both sides of an Iff pair share a split (guaranteed by rule 1 when both
      live in one declaration; enforced explicitly for cross-decl pairs).
 
-Assignment is deterministic (BLAKE3 of the area name, no RNG) so the split
-manifest is reproducible from the corpus alone; the manifest still gets a CID
-because "reproducible" is a claim and the CID is its evidence.
+Assignment is deterministic (BLAKE3 of a module path: under RULE_V2 the
+component's smallest module, under RULE_V1 the row's own module; no RNG), so
+the split is reproducible from the corpus alone: under RULE_V2 from the set of
+rows, under RULE_V1 only from the rows in the order the build read them. It
+still gets a certificate CID because "reproducible" is a claim and the CID is
+its evidence.
 
 Rules are VERSIONED, because sealed checkpoints were trained under an older
 one and an evaluator must reproduce the split a checkpoint trained against,

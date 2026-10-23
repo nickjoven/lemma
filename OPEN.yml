@@ -10,7 +10,8 @@
   status: open
   title: S3 gloss tower is representation-limited; same-module hard-drift AUC 0.807 < 0.90 gate
   detail: >
-    Two S3 runs failed the gate on held-out modules. v1 (s3-gloss-20260910-174141,
+    Two S3 runs failed the gate on the held-out test split (the v1 rule's:
+    held out by declaration and lock, not by whole module; L-12). v1 (s3-gloss-20260910-174141,
     eval ca34a4b7...): hard AUC 0.767, retrieval MRR 0.398. v2 with module-grouped
     hard-negative batches and val early stopping (s3-gloss-20260911-012141, eval
     3d8a926c...): hard AUC 0.807, retrieval MRR 0.400 — mining gave +0.04 but the
@@ -129,7 +130,8 @@
     ladder rfl/decide/simp/omega/exact?/aesop) emitted 26,130 transitions over
     5,923 goal states, but only 511 are state-to-state single steps (one goal
     in, a different goal out): 486 from simp, 23 from aesop; every other rung
-    either closes the goal or errors. Module-held-out single steps: 12. The
+    either closes the goal or errors. Held-out (test-split) single steps: 12
+    (v1 split, so held out by declaration and lock, not whole module; L-12). The
     sealed W0 baselines (w0-baselines run, metrics fadd1511...) are therefore
     saturated (identity 0.917, offset 1.000, lexical 1.000 on 12 candidates;
     permutation 0.277) and cannot bound a learned predictor. Energy targets
@@ -147,7 +149,7 @@
     2026-09-12 update — quod mutants-A-t1 (manifest 847bcbce...) changed the
     count: on MUTANTS, simp and aesop leave goals open instead of closing, so
     the wired corpus has 69,040 transitions, 7,331 single steps (simp 3,927,
-    aesop 3,401), 284 module-held-out. Baselines re-sealed (metrics
+    aesop 3,401), 284 in the held-out test split (v1; L-12). Baselines re-sealed (metrics
     25c962b5...): identity 0.321, offset 0.792, lexical 0.579, permuted 0.021;
     energy table over 11,545 states, 880 censored. W0 v1 trained (w0-world-20260912-012400,
     val MRR best 0.843 @ 3250; eval 4e493983..., calibration_failed):
@@ -168,7 +170,8 @@
     2026-09-12 RESOLVED for the retrieval gate — the stepping prover
     (quod ladder-S, runs pilot-S 285ea472..., pilot-S-neg 501ae3fe...,
     test200-S 91c94612...) added multi-step trajectories: corpus 107,427
-    transitions, 11,297 single steps (507 module-held-out, 1,089 on true
+    transitions, 11,297 single steps (507 in the held-out test split under
+    v1, L-12; 1,089 on true
     statements). Baselines re-sealed (d0f7a039...): identity 0.304, offset
     0.577, lexical 0.456. W0 v2 (w0-world-20260912-124023, config unchanged except
     the corpus inputs; eval d991f7e1..., calibration PASS): next-state MRR
@@ -186,7 +189,8 @@
   detail: >
     W0 v1 and v2 (evals 4e493983..., d991f7e1...) predict a log-heartbeat
     cost >= the cap for only 11% and 1.6% of the rows that actually hit the
-    cap (63 and 36 test rows), with MAE 0.75 in log-heartbeats on uncensored
+    cap (63 and 36 test rows; the v1 test split, held out by declaration and
+    lock, not by whole module, L-12), with MAE 0.75 in log-heartbeats on uncensored
     rows. The Tobit survival term at weight 0.2 next to InfoNCE and outcome
     CE is too weak, and censored rows are 1.4% of training rows.
   fix: >
@@ -292,7 +296,8 @@
     more than one split), so some fix is needed; which one is the decision.
     The same limit applies to every sealed S3, S4, S5 and W0 number: those
     runs trained and were evaluated under the old rule, so "held-out
-    modules" / "module-held-out" in their entries (L-1, L-7) means held out
+    modules" / "module-held-out" / "test rows" in their entries (L-1, L-7,
+    L-8) means held out
     by declaration and by lock, with up to 496 modules straddling splits,
     not by whole module.
   fix: >
@@ -312,7 +317,11 @@
     recorded corpus (MANIFEST source CID = the run's corpus_cids[0], every
     shard verified, shard order = the pin's declarations_shards_blake3, or
     refused), and that reconstruction is the only link between the eval
-    split and the training split: no split the run sealed confirms it. And
+    split and the training split: no split the run sealed confirms it. A
+    new run trained on top of such a run records a certificate that carries
+    the pin's provenance, and it and its eval report the weakest link
+    (split_manifest_binding = pinned_rule_reconstructed, split_pinned_run)
+    rather than train_record_cid. And
     build_cache refuses a RULE_V2 split whose largest
     component holds more than 10% of the rows unless --override-l12, which
     the manifest records (l12_override); train.record_cache_split re-checks

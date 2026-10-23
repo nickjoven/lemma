@@ -1,4 +1,6 @@
-"""S4 v2 eval on module-held-out mutants with prover-relative labels.
+"""S4 v2 eval on held-out mutants (the test split the run trained against;
+for a v1 run held out by declaration and lock, not by whole module, OPEN.yml
+L-12) with prover-relative labels.
 
   verdict     macro-F1 over the decided class set (GATE >= 0.80) and accuracy
   baseline    bag-of-tokens logistic regression on the same split; the model

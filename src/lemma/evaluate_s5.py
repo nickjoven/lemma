@@ -1,4 +1,6 @@
-"""S5 equivalence-discovery eval on held-out modules, with controls.
+"""S5 equivalence-discovery eval on the held-out test split the run trained
+against (split_binding; for a v1 run held out by declaration and lock, not by
+whole module, OPEN.yml L-12), with controls.
 
   known-iff   lhs -> rhs retrieval among all test rhs PLUS a distractor pool of
               test-split statements: MRR (the S5 GATE, >= 0.5), R@1, R@10
