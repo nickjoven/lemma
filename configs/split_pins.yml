@@ -1,0 +1,73 @@
+# Split-rule pins for runs that record no split_manifest_cid (every run sealed
+# before lemma #10). lemma.data.split_binding refuses to evaluate such a run,
+# or to train on top of it, unless its rule is pinned here or passed
+# explicitly; it never falls back to today's rule.
+#
+# Evidence for each pin: the run's recorded code_git, and the blob of
+# src/lemma/data/splits.py at that commit. Both blobs listed below have the
+# same assign() (b0d106c only adds assign_transitions), which is
+# splits.assign_v1 byte for byte. Limit: these records predate the dirty-tree
+# check (L-10), so that the tree matched code_git is not verified; a pin is a
+# statement about code history, not a sealed split. tests/test_split_binding.py
+# re-checks the blobs when the commits are present.
+#
+# Owed (OPEN.yml L-9): the s2 cache's split-manifest.json on the GPU box, if it
+# is still the one the checkpoint trained on, should be checked against the
+# v1 reconstruction (evaluate_s2 --split-manifest) and its BLAKE3 recorded.
+runs:
+  s2-mlm-20260909-141736:
+    # code_git is the TRAIN commit; build_cache ran at an unrecorded commit.
+    # splits.py assign() is unchanged from c283a57 (module-level split) to
+    # bfc9556; evaluate_s2 also requires the v1 rebuild to reproduce the
+    # per-split counts of corpora/cache/cache-report.json.
+    split_rule: v1-module-lock-follows-first
+    code_git: a37d73e4b7487e63759230ec910b4e2cb58a83c1
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+  s3-smoke:
+    split_rule: v1-module-lock-follows-first
+    code_git: 022fe9026448f787e316ec9aa3978133e9dc8d1f
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+  s3-gloss-20260910-174141:
+    split_rule: v1-module-lock-follows-first
+    code_git: 022fe9026448f787e316ec9aa3978133e9dc8d1f
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+  s3v2-smoke:
+    split_rule: v1-module-lock-follows-first
+    code_git: 2eb395344c36ff255a8b1361c7d443a3206447b5
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+  s3-gloss-20260911-012141:
+    split_rule: v1-module-lock-follows-first
+    code_git: 2eb395344c36ff255a8b1361c7d443a3206447b5
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+  s5-smoke:
+    split_rule: v1-module-lock-follows-first
+    code_git: a3b3c5a88201d6f6a5f99ca4c6281acf8949fda4
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+  s4-smoke:
+    split_rule: v1-module-lock-follows-first
+    code_git: 75a950fce0f9e29e563a9d744ac01dfc35e7dc2a
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+  s4-smoke2:
+    split_rule: v1-module-lock-follows-first
+    code_git: b1caa07952b442128fe4b2c488a690d48b1b50d4
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+  s5-equiv-20260911-125959:
+    split_rule: v1-module-lock-follows-first
+    code_git: 396ead39be8a937c16a6440ec89c506428495a2e
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+  s4-verdict-20260911-152400:
+    split_rule: v1-module-lock-follows-first
+    code_git: ce5b4ed859e0843e9474fe9105ba7f4da61064d9
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+  s4v2-verdict-20260911-223439:
+    split_rule: v1-module-lock-follows-first
+    code_git: 13d42dc34cda3b8ed26bf4cfdfa5627254557be1
+    splits_py_blob: b0d106ca5b607aed8c52655927cf61cf850a1bf5
+  w0-world-20260912-012400:
+    split_rule: v1-module-lock-follows-first
+    code_git: 04721673ac3119afb7baacc0d3260d08e72fddc3
+    splits_py_blob: b0d106ca5b607aed8c52655927cf61cf850a1bf5
+  w0-world-20260912-124023:
+    split_rule: v1-module-lock-follows-first
+    code_git: 6661b30354ec669128b8094d3e2af5d1d993893b
+    splits_py_blob: b0d106ca5b607aed8c52655927cf61cf850a1bf5

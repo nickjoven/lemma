@@ -36,6 +36,28 @@ def collate(batch: list[np.ndarray], pad_id: int, max_seq: int) -> torch.Tensor:
     return out
 
 
+def record_cache_split(cache_dir: Path) -> str:
+    """Seal the certificate of the split the cache in `cache_dir` was built
+    from; refuses a cache without its manifest, a manifest without a known
+    rule id, or one whose counts are not the cache report's."""
+    import json
+
+    from .data import split_binding, splits
+    split_manifest, report = cache_dir / "split-manifest.json", cache_dir / "cache-report.json"
+    for f in (split_manifest, report):
+        if not f.is_file():
+            raise SystemExit(f"{f} is missing: a cache without its split manifest and report "
+                             "cannot support a later held-out evaluation")
+    manifest = json.loads(split_manifest.read_text())
+    if "rule_id" not in manifest:
+        raise SystemExit(f"{split_manifest} names no rule_id (built before #10); rebuild the cache")
+    cert = splits.certificate(manifest["assignment"], manifest["rule_id"])
+    want = {s: v["sequences"] for s, v in json.loads(report.read_text())["splits"].items()}
+    if {s: cert["counts"].get(s, 0) for s in want} != want:
+        raise SystemExit(f"split manifest counts {cert['counts']} differ from the cache report {want}")
+    return split_binding.put_certificate(cert)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", type=Path, required=True)
@@ -52,14 +74,13 @@ def main() -> int:
 
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     cache = CachedStatements(REPO_ROOT / cfg["cache_dir"], cfg["cache_name"])
-    # the split this checkpoint trains against, by CID: evaluate_s2 refuses any
-    # other manifest for a held-out claim (lemma #5); without this the check
-    # has nothing to compare against and the binding is the cache report only
-    split_manifest = REPO_ROOT / cfg["cache_dir"] / "split-manifest.json"
-    if not split_manifest.is_file():
-        raise SystemExit(f"{split_manifest} is missing: a cache without its split manifest "
-                         "cannot support a later held-out evaluation")
-    split_manifest_cid = ledger.ket_put(split_manifest.read_bytes())
+    # the split this checkpoint trains against, by CID (lemma #5): a
+    # splits.certificate (rule id + per-split name digests), which every
+    # evaluator and downstream trainer verifies a rebuild against
+    # (split_binding.resolve). Not the full manifest: at ~296k names that is
+    # 15-20 MB per run in the git-tracked store, and the certificate pins the
+    # same assignment exactly (review of #10).
+    split_manifest_cid = record_cache_split(REPO_ROOT / cfg["cache_dir"])
     enc_cfg = EncoderConfig(vocab_size=tok.get_vocab_size(), **cfg.get("encoder", {}))
     model = Encoder(enc_cfg).to(device)
     head = MLMHead(model).to(device)

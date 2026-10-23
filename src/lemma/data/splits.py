@@ -14,6 +14,20 @@ Rules (in force for every stage):
 Assignment is deterministic (BLAKE3 of the area name, no RNG) so the split
 manifest is reproducible from the corpus alone; the manifest still gets a CID
 because "reproducible" is a claim and the CID is its evidence.
+
+Rules are VERSIONED, because sealed checkpoints were trained under an older
+one and an evaluator must reproduce the split a checkpoint trained against,
+never today's (review of #10):
+  RULE_V1  module blake3, a row follows the first-seen split of its lock
+           (assign_v1). Every run sealed before #10 trained under it. It is
+           order-dependent and can split a module (#6); kept only so those
+           runs can be evaluated against their own split.
+  RULE_V2  module blake3 over connected components (assign). Current rule;
+           its giant component is an open owner decision (OPEN.yml L-12).
+A run records which rule and which assignment by `certificate`: the rule id
+plus a BLAKE3 digest of each split's sorted name list. It is small enough
+for the git-tracked store (the full name->split manifest is ~15-20 MB on the
+real corpus) and lets an evaluator verify a reconstruction exactly.
 """
 
 from __future__ import annotations
@@ -26,6 +40,20 @@ from ..schemas import DeclarationRow, MutantRow
 
 SPLITS = ("train", "val", "test")
 WEIGHTS = (0.90, 0.05, 0.05)
+
+RULE_V1 = "v1-module-lock-follows-first"
+RULE_V2 = "v2-module-lock-components"
+CURRENT_RULE = RULE_V2
+# the free-text `rule` strings older manifests carry, mapped to their rule id
+RULE_DESCRIPTIONS = {
+    "module-area blake3, lock-follows-first, mutant-inherits-parent": RULE_V1,
+    "module blake3 over connected components joined by shared locks, mutant-inherits-parent": RULE_V2,
+}
+CERT_FORMAT = "lemma-split-cert/1"
+# L-12 guard: a component holding more than this fraction of the rows makes a
+# RULE_V2 manifest refuse to build until the owner decides L-12. A guard, not
+# the decision: it only stops the rule from being used silently.
+GIANT_COMPONENT_MAX_FRACTION = 0.10
 
 
 def split_key(module: str) -> str:
@@ -93,6 +121,78 @@ def assign(rows: list[DeclarationRow]) -> dict[str, str]:
     return {row.name: split_of_area(comp[row.module]) for row in rows}
 
 
+def assign_v1(rows: list[DeclarationRow]) -> dict[str, str]:
+    """RULE_V1, byte-for-byte the pre-#10 assign(): name -> split, the module
+    hash unless the row's lock was already seen, in which case it follows the
+    first-seen row. ORDER-DEPENDENT: reproduces a v1 split only over rows in
+    the order the original build read them (iter_rows over the same shards).
+    Not for new manifests; see the module docstring."""
+    by_lock: dict[str, str] = {}
+    out: dict[str, str] = {}
+    for row in rows:
+        if row.lock in by_lock:
+            out[row.name] = by_lock[row.lock]
+        else:
+            s = split_of_area(row.module)
+            out[row.name] = s
+            by_lock[row.lock] = s
+    return out
+
+
+ASSIGNERS = {RULE_V1: assign_v1, RULE_V2: assign}
+
+
+def rule_id(rule: str) -> str:
+    """A rule id from an id or an older manifest's description; unknown is an error."""
+    if rule in ASSIGNERS:
+        return rule
+    if rule in RULE_DESCRIPTIONS:
+        return RULE_DESCRIPTIONS[rule]
+    raise ValueError(f"unknown split rule {rule!r}; known: {sorted(ASSIGNERS)}")
+
+
+def assign_under(rule: str, rows: list[DeclarationRow]) -> dict[str, str]:
+    return ASSIGNERS[rule_id(rule)](rows)
+
+
+def certificate(assignment: dict[str, str], rule: str) -> dict:
+    """The compact, verifiable record of a split: rule id, per-split counts,
+    and the BLAKE3 of each split's sorted, newline-joined name list."""
+    names = {s: sorted(n for n, v in assignment.items() if v == s) for s in SPLITS}
+    unknown = set(assignment.values()) - set(SPLITS)
+    if unknown:
+        raise ValueError(f"assignment uses unknown splits {sorted(unknown)}")
+    return {"format": CERT_FORMAT, "rule_id": rule_id(rule),
+            "counts": {s: len(v) for s, v in names.items()},
+            "names_blake3": {s: blake3.blake3("\n".join(v).encode()).hexdigest() for s, v in names.items()}}
+
+
+def certificate_mismatch(cert: dict, assignment: dict[str, str]) -> str | None:
+    """None if `assignment` is exactly the split `cert` records, else why not."""
+    if cert.get("format") != CERT_FORMAT:
+        return f"not a split certificate (format {cert.get('format')!r}, want {CERT_FORMAT})"
+    got = certificate(assignment, cert["rule_id"])
+    if got["counts"] != cert["counts"]:
+        return f"per-split counts {got['counts']} differ from the certificate's {cert['counts']}"
+    bad = [s for s in SPLITS if got["names_blake3"][s] != cert["names_blake3"][s]]
+    if bad:
+        return f"the {', '.join(bad)} name list(s) differ from the certificate's"
+    return None
+
+
+def component_guard(rows: list[DeclarationRow], max_fraction: float = GIANT_COMPONENT_MAX_FRACTION) -> dict:
+    """L-12: refuse a RULE_V2 split whose largest component holds more than
+    max_fraction of the rows. Returns the component stats when it passes."""
+    stats = component_stats(rows)
+    frac = stats["largest_component_rows"] / max(len(rows), 1)
+    if frac > max_fraction:
+        raise ValueError(
+            f"the largest connected component holds {stats['largest_component_rows']} of {len(rows)} rows "
+            f"({frac:.1%} > {max_fraction:.0%}): OPEN.yml L-12 is an open owner decision (accept, exclude hub "
+            "locks from the join, or keep the component out of val/test); this split rule is not used until it is decided")
+    return stats
+
+
 def component_stats(rows: list[DeclarationRow]) -> dict:
     """Disclosed with the manifest: how much the shared-lock joins coarsened
     the module partition. A large component is a warning that the split may
@@ -101,6 +201,9 @@ def component_stats(rows: list[DeclarationRow]) -> dict:
     sizes: dict[str, int] = defaultdict(int)
     for key in comp.values():
         sizes[key] += 1
+    row_sizes: dict[str, int] = defaultdict(int)
+    for row in rows:
+        row_sizes[comp[row.module]] += 1
     multi = {k: n for k, n in sizes.items() if n > 1}
     return {
         "modules": len(comp),
@@ -108,6 +211,7 @@ def component_stats(rows: list[DeclarationRow]) -> dict:
         "multi_module_components": len(multi),
         "modules_in_multi_module_components": sum(multi.values()),
         "largest_component_modules": max(sizes.values()) if sizes else 0,
+        "largest_component_rows": max(row_sizes.values()) if row_sizes else 0,
     }
 
 
@@ -120,9 +224,10 @@ def assign_mutants(mutants: list[MutantRow], decl_splits: dict[str, str]) -> dic
     return out
 
 
-def manifest(rows: list[DeclarationRow]) -> dict:
+def manifest(rows: list[DeclarationRow], rule: str = CURRENT_RULE) -> dict:
     """The split manifest: assignment plus the honesty statistics."""
-    splits = assign(rows)
+    rule = rule_id(rule)
+    splits = assign_under(rule, rows)
     counts = defaultdict(int)
     for s in splits.values():
         counts[s] += 1
@@ -133,7 +238,8 @@ def manifest(rows: list[DeclarationRow]) -> dict:
     inter = len(deps["train"] & deps["test"])
     union = len(deps["train"] | deps["test"]) or 1
     return {
-        "rule": "module blake3 over connected components joined by shared locks, mutant-inherits-parent",
+        "rule": next(d for d, r in RULE_DESCRIPTIONS.items() if r == rule),
+        "rule_id": rule,
         "weights": dict(zip(SPLITS, WEIGHTS)),
         "counts": dict(counts),
         "components": component_stats(rows),

@@ -100,4 +100,5 @@ def test_manifest_reports_component_sizes():
     assert m["components"] == {
         "modules": 3, "components": 2, "multi_module_components": 1,
         "modules_in_multi_module_components": 2, "largest_component_modules": 2,
+        "largest_component_rows": 2,
     }

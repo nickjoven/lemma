@@ -28,11 +28,20 @@ def main() -> int:
     ap.add_argument("--tokenizer", type=Path, required=True)
     ap.add_argument("--out", type=Path, default=REPO_ROOT / "corpora" / "cache")
     ap.add_argument("--max-seq", type=int, default=512)
+    ap.add_argument("--rule", default=splits.CURRENT_RULE, choices=sorted(splits.ASSIGNERS),
+                    help="split rule; v1 only to rebuild a legacy cache (it can split a module, #6)")
+    ap.add_argument("--override-l12", action="store_true",
+                    help="build a v2 split despite the L-12 giant-component guard (recorded in the manifest)")
     args = ap.parse_args()
 
     tok = Tokenizer.from_file(str(args.tokenizer))
     rows = list(iter_rows("declarations"))
-    assignment = splits.assign(rows)
+    if args.rule == splits.RULE_V2 and not args.override_l12:
+        try:
+            splits.component_guard(rows)
+        except ValueError as e:
+            raise SystemExit(str(e))
+    assignment = splits.assign_under(args.rule, rows)
 
     by_split: dict[str, list[str]] = {s: [] for s in splits.SPLITS}
     for r in rows:
@@ -45,7 +54,11 @@ def main() -> int:
         print(f"{split}: {stats['sequences']} seqs, {stats['tokens']} tokens, "
               f"trunc {stats['truncation_rate']}")
 
-    manifest = splits.manifest(rows)
+    manifest = splits.manifest(rows, args.rule)
+    if manifest["assignment"] != assignment:
+        raise SystemExit("split manifest and cache assignment disagree")
+    if args.override_l12:
+        manifest["l12_override"] = True
     (args.out / "split-manifest.json").write_text(json.dumps(manifest, indent=1))
     (args.out / "cache-report.json").write_text(json.dumps(report, indent=1))
     print(f"split dep-jaccard(train,test)={manifest['train_test_dep_jaccard']} "

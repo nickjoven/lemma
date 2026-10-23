@@ -27,3 +27,13 @@ def clean_repo(tmp_path, monkeypatch):
     repo = git_repo(tmp_path / "repo")
     monkeypatch.setattr(ledger, "REPO_ROOT", repo)
     return repo
+
+
+@pytest.fixture
+def ket_store(tmp_path, monkeypatch):
+    """A throwaway ket store and ledger file for tests that seal evidence."""
+    home = tmp_path / ".ket"
+    subprocess.run(["ket", "--home", str(home), "init"], check=True, capture_output=True)
+    monkeypatch.setattr(ledger, "KET_HOME", home)
+    monkeypatch.setattr(ledger, "LEDGER", tmp_path / "ledger.jsonl")
+    return home
