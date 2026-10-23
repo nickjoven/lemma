@@ -1,4 +1,8 @@
-"""S3 gloss-fidelity eval on held-out (test-split) modules, with controls.
+"""S3 gloss-fidelity eval on the held-out test split, with controls.
+
+The split is the one the run trained against (split_binding); for every
+sealed S3 run that is the v1 rule, held out by declaration and lock, not by
+whole module (OPEN.yml L-12).
 
   retrieval   gloss -> its statement among all test statements (MRR, R@1, R@10)
   drift-easy  ROC-AUC: matched pair vs docstring x random other statement

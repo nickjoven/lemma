@@ -305,7 +305,9 @@
     modules" / "module-held-out" / "test rows" in their entries (L-1, L-7,
     L-8) means held out
     by declaration and by lock, with up to 496 modules straddling splits,
-    not by whole module.
+    not by whole module. configs/w0_world.yaml (line 4, "module-held-out
+    single-step transitions") is left unedited because its bytes are the
+    config_cid the W0 runs sealed; the same qualification applies to it.
   fix: >
     Decide one of: accept a 2.9% test split dominated by one hub; exclude
     hub locks (a lock shared by more than K modules) from the join; or
