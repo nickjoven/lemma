@@ -44,19 +44,79 @@ def moved(rows):
     return out
 
 
+ASSIGNERS = {"assign", "assign_v1", "assign_under", "split_of_area", "_components", "ASSIGNERS"}
+
+
+def _dotted(node) -> str:
+    parts = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+    return ".".join(reversed(parts))
+
+
+def split_violations(tree) -> list[str]:
+    """Any route to an assigner outside splits/build_cache/split_binding:
+    splits.<assigner> under any alias of the splits module, a from-import
+    of an assigner, getattr by string, or split_binding.resolve() called
+    directly (it trusts its caller that the rows are the recorded corpus;
+    entrypoints use resolve_corpus)."""
+    splits_aliases, binding_aliases, errs = {"splits"}, {"split_binding"}, []
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.Import, ast.ImportFrom)):
+            mod = getattr(n, "module", None) or ""
+            for a in n.names:
+                if a.name == "splits" or a.name.endswith(".splits"):
+                    splits_aliases.add(a.asname or a.name)
+                if a.name == "split_binding" or a.name.endswith(".split_binding"):
+                    binding_aliases.add(a.asname or a.name)
+                if isinstance(n, ast.ImportFrom) and mod.split(".")[-1] == "splits" and (
+                        a.name in ASSIGNERS or a.name == "*"):
+                    errs.append(f"{n.lineno}: from {mod} import {a.name}")
+                if isinstance(n, ast.ImportFrom) and mod.split(".")[-1] == "split_binding" and a.name in ("resolve", "*"):
+                    errs.append(f"{n.lineno}: from {mod} import {a.name}")
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Attribute) and n.attr in ASSIGNERS - {"ASSIGNERS"} and _dotted(n.value) in splits_aliases:
+            errs.append(f"{n.lineno}: {_dotted(n)}")
+        # the ASSIGNERS table may be listed (argparse choices), not indexed or walked
+        if (isinstance(n, (ast.Subscript, ast.Attribute)) and isinstance(n.value, ast.Attribute)
+                and n.value.attr == "ASSIGNERS" and _dotted(n.value.value) in splits_aliases):
+            errs.append(f"{n.lineno}: {_dotted(n.value)} indexed")
+        if isinstance(n, ast.Attribute) and n.attr == "resolve" and _dotted(n.value) in binding_aliases:
+            errs.append(f"{n.lineno}: {_dotted(n)} (use resolve_corpus)")
+        if isinstance(n, ast.Constant) and n.value in ASSIGNERS - {"assign"}:
+            errs.append(f"{n.lineno}: {n.value!r} by string")
+        if (isinstance(n, ast.Call) and getattr(n.func, "id", "") == "getattr" and len(n.args) > 1
+                and isinstance(n.args[1], ast.Constant) and n.args[1].value in ASSIGNERS | {"resolve"}):
+            errs.append(f"{n.lineno}: getattr(..., {n.args[1].value!r})")
+    return errs
+
+
 def test_no_entrypoint_recomputes_the_split():
     """Only build_cache (which writes a new split) and splits itself may call
-    an assigner; everything else goes through split_binding."""
+    an assigner; everything else goes through split_binding.resolve_corpus."""
     allowed = {"data/splits.py", "data/build_cache.py", "data/split_binding.py"}
     for path in SRC.rglob("*.py"):
         rel = path.relative_to(SRC).as_posix()
-        if rel in allowed:
-            continue
-        for node in ast.walk(ast.parse(path.read_text())):
-            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                    and isinstance(node.func.value, ast.Name) and node.func.value.id == "splits"
-                    and node.func.attr in {"assign", "assign_v1", "assign_under", "split_of_area"}):
-                pytest.fail(f"{rel}:{node.lineno} calls splits.{node.func.attr}")
+        if rel not in allowed:
+            assert split_violations(ast.parse(path.read_text())) == [], rel
+
+
+@pytest.mark.parametrize("snippet", [
+    "from .data.splits import assign\nassign(rows)\n",
+    "from .data.splits import assign as a\na(rows)\n",
+    "from .data import splits as sp\nsp.assign_v1(rows)\n",
+    "import lemma.data.splits\nlemma.data.splits.assign_under(r, rows)\n",
+    "from .data import splits\nsplits.ASSIGNERS[r](rows)\n",
+    "from .data import splits\ngetattr(splits, 'assign')(rows)\n",
+    "from .data import splits\nsplits.ASSIGNERS.get(r)(rows)\n",
+    "from .data import split_binding\nsplit_binding.resolve(run, rows, corpus={})\n",
+    "from .data.split_binding import resolve\n",
+])
+def test_routes_around_split_binding_are_caught(snippet):
+    assert split_violations(ast.parse(snippet))
 
 
 def test_unpinned_legacy_run_is_refused_downstream(corpus_rows):
