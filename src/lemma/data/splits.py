@@ -122,7 +122,9 @@ def assign(rows: list[DeclarationRow]) -> dict[str, str]:
 
 
 def assign_v1(rows: list[DeclarationRow]) -> dict[str, str]:
-    """RULE_V1, byte-for-byte the pre-#10 assign(): name -> split, the module
+    """RULE_V1, the pre-#10 assign() (its body is AST-equal to the pinned
+    blobs' assign(), docstring aside; tests/test_split_binding.py checks it
+    against git history): name -> split, the module
     hash unless the row's lock was already seen, in which case it follows the
     first-seen row. ORDER-DEPENDENT: reproduces a v1 split only over rows in
     the order the original build read them (iter_rows over the same shards).

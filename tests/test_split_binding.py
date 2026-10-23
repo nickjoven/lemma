@@ -3,11 +3,13 @@ takes the split a checkpoint trained against, by evidence, never today's
 rule; a run with no recorded split needs a pinned rule; the recorded split is
 a small certificate, not the 15-20 MB manifest."""
 
+import ast
 import json
 import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 from lemma import ledger
 from lemma.data import split_binding, splits
@@ -63,17 +65,67 @@ def test_v1_and_v2_disagree_on_the_fixture():
         splits.rule_id("fixture")
 
 
-def test_assign_v1_is_the_pre_10_assign_byte_for_byte():
-    # the legacy function must be the one sealed runs trained under (main's splits.py)
-    src = subprocess.run(["git", "-C", str(REAL_REPO), "show", "main:src/lemma/data/splits.py"],
-                         capture_output=True, text=True)
-    if src.returncode != 0:
-        pytest.skip("main is not available in this checkout")
+# the splits.py blobs every sealed run's code_git holds (configs/split_pins.yml):
+# 524a2b44 is the pre-#10 file (c283a57..bfc9556), b0d106ca only adds assign_transitions
+V1_BLOBS = ("524a2b447f383761d70f120dc673c05b662adb6e", "b0d106ca5b607aed8c52655927cf61cf850a1bf5")
+
+
+def git_object(spec: str) -> str:
+    """`git cat-file -p spec` in this repo. Missing evidence FAILS in a full
+    clone; only a shallow clone (which cannot hold history) skips."""
+    got = subprocess.run(["git", "-C", str(REAL_REPO), "cat-file", "-p", spec], capture_output=True, text=True)
+    if got.returncode == 0:
+        return got.stdout
+    shallow = subprocess.run(["git", "-C", str(REAL_REPO), "rev-parse", "--is-shallow-repository"],
+                             capture_output=True, text=True).stdout.strip()
+    if shallow == "true":
+        pytest.skip(f"{spec} is not in this shallow clone (CI fetches full history)")
+    pytest.fail(f"{spec} is missing from a full clone: the pin evidence it names cannot be checked")
+
+
+def _body(tree, name):
+    fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name)
+    body = fn.body[1:] if isinstance(fn.body[0], ast.Expr) and isinstance(fn.body[0].value, ast.Constant) else fn.body
+    return [ast.dump(n) for n in body]
+
+
+def _const(tree, name):
+    return next(ast.dump(n.value) for n in tree.body if isinstance(n, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == name for t in n.targets))
+
+
+@pytest.mark.parametrize("blob", V1_BLOBS)
+def test_assign_v1_is_the_pinned_blobs_assign_ast_equal_and_on_fixtures(blob):
+    """splits.assign_v1 is the assign() of the pinned blobs: the same function
+    body (AST-equal, docstring aside), the same split_of_area / split_key /
+    SPLITS / WEIGHTS it depends on, and the same output on fixtures in several
+    orders. Pinned to the blobs, not to `main`, whose assign() is the v2 rule
+    after #10 merges."""
+    old_src = git_object(blob)
+    old, new = ast.parse(old_src), ast.parse(Path(splits.__file__).read_text())
+    assert _body(old, "assign") == _body(new, "assign_v1")
+    for name in ("split_of_area", "split_key"):
+        assert _body(old, name) == _body(new, name), name
+    for name in ("SPLITS", "WEIGHTS"):
+        assert _const(old, name) == _const(new, name), name
     ns: dict = {}
-    exec(compile(src.stdout.replace("from ..schemas", "from lemma.schemas"), "main_splits", "exec"), ns)
-    rows = rule_change_rows()
-    for order in (rows, rows[::-1]):
+    exec(compile(old_src.replace("from ..schemas", "from lemma.schemas"), f"splits@{blob[:8]}", "exec"), ns)
+    first, second = swap_rows()
+    for order in (rule_change_rows(), rule_change_rows()[::-1], first + second, second + first):
         assert splits.assign_v1(order) == ns["assign"](order)
+
+
+def test_certificate_detects_equal_counts_with_different_names():
+    """The per-split name digests, not only the counts, must match: two
+    assignments with identical counts that differ by a swap are told apart."""
+    rows = rule_change_rows()
+    a = splits.assign(rows)
+    t = next(n for n, v in a.items() if v == "test")
+    r = next(n for n, v in a.items() if v == "train")
+    b = {**a, t: "train", r: "test"}
+    assert counts(a) == counts(b) and a != b
+    why = splits.certificate_mismatch(splits.certificate(a, splits.RULE_V2), b)
+    assert why is not None and "name list" in why
 
 
 def test_unpinned_run_without_a_recorded_split_is_refused(tmp_path, ket_store):
@@ -147,17 +199,28 @@ def test_component_guard_refuses_a_giant_component():
 
 
 def test_real_pins_name_v1_and_match_code_history():
+    """Every pin's evidence is re-checked against history: its code_git is the
+    code_git its train record sealed, the splits.py blob at that commit is the
+    pinned v1 blob, and the shard order and corpus source at that commit are
+    the pinned ones. A commit missing from a full clone fails."""
+    from lemma.data import corpus
     entries = split_binding.load_pins()
-    sealed = {json.loads(l)["run_id"] for l in (REAL_REPO / "runs" / "ledger.jsonl").read_text().splitlines()
-              if l.strip() and json.loads(l)["kind"] == "train" and json.loads(l)["status"] == "completed"}
-    assert sealed <= set(entries), f"sealed train runs without a pin: {sorted(sealed - set(entries))}"
-    v1_blobs = {"524a2b447f383761d70f120dc673c05b662adb6e", "b0d106ca5b607aed8c52655927cf61cf850a1bf5"}
+    lines = [json.loads(l) for l in (REAL_REPO / "runs" / "ledger.jsonl").read_text().splitlines() if l.strip()]
+    trained = {r["run_id"]: r for r in lines if r["kind"] == "train" and r["status"] == "completed"}
+    assert set(trained) <= set(entries), f"sealed train runs without a pin: {sorted(set(trained) - set(entries))}"
+    assert set(entries) <= set(trained), f"pins for runs with no completed train record: {sorted(set(entries) - set(trained))}"
     for run_id, pin in entries.items():
-        assert pin["split_rule"] == splits.RULE_V1 and pin["splits_py_blob"] in v1_blobs
-        got = subprocess.run(["git", "-C", str(REAL_REPO), "rev-parse", f"{pin['code_git']}:src/lemma/data/splits.py"],
-                             capture_output=True, text=True)
-        if got.returncode == 0:
-            assert got.stdout.strip() == pin["splits_py_blob"], run_id
+        rec = trained[run_id]
+        assert pin["split_rule"] == splits.RULE_V1 and pin["splits_py_blob"] in V1_BLOBS, run_id
+        assert pin["code_git"] == rec["inputs"]["code_git"], f"{run_id}: pin code_git is not the sealed one"
+        blob = subprocess.run(["git", "-C", str(REAL_REPO), "rev-parse", f"{pin['code_git']}:src/lemma/data/splits.py"],
+                              capture_output=True, text=True).stdout.strip()
+        if not blob:
+            git_object(pin["code_git"])     # fails in a full clone, skips in a shallow one
+        assert blob == pin["splits_py_blob"], run_id
+        man = yaml.safe_load(git_object(f"{pin['code_git']}:corpora/MANIFEST.yml"))
+        assert corpus.shard_order_blake3(man["corpora"]["declarations"]) == pin["declarations_shards_blake3"], run_id
+        assert man["source"]["manifest_cid"] == rec["inputs"]["corpus_cids"][0], run_id
 
 
 def _cache(tmp_path, rows, rule=splits.RULE_V2, counts=None, rule_id=True):
