@@ -1,4 +1,4 @@
-"""S4 v1 eval on module-held-out mutants, with the plan's controls.
+"""S4 v1 eval on held-out (trained-split) mutants, with the plan's controls.
 
   elaborates  macro-F1 (GATE >= 0.80) and accuracy on the test split
   baseline    bag-of-tokens logistic regression on the same split; the model

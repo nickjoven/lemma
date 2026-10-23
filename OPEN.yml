@@ -269,7 +269,7 @@
     evaluation of that pair.
 - id: L-12
   severity: high
-  status: open (decision needed before the component rule is used for any new split manifest)
+  status: open (owner decision owed; until then build_cache refuses a component-rule split whose largest component exceeds 10% of rows, and every evaluator takes the split its run trained against)
   title: the connected-component split rule produces one giant component holding 45% of the corpus
   detail: >
     Under the rule on github #10 (modules joined by shared locks form one
@@ -284,10 +284,26 @@
     names). Measured in the review of #10 on 2026-09-24; the numbers are not
     sealed. The old rule did violate module unity (496 modules split across
     more than one split), so some fix is needed; which one is the decision.
+    The same limit applies to every sealed S3, S4, S5 and W0 number: those
+    runs trained and were evaluated under the old rule, so "held-out
+    modules" / "module-held-out" in their entries (L-1, L-7) means held out
+    by declaration and by lock, with up to 496 modules straddling splits,
+    not by whole module.
   fix: >
     Decide one of: accept a 2.9% test split dominated by one hub; exclude
     hub locks (a lock shared by more than K modules) from the join; or
     exclude the giant component from val/test. Then seal the component
     statistics with the next split manifest. Until decided, evaluators take
-    the manifest a checkpoint was trained against (evaluate_s2
-    --split-manifest), never a fresh assignment.
+    the split a checkpoint was trained against, never a fresh assignment.
+    Implemented in the review of #10 (the decision itself is NOT made):
+    split rules are versioned (splits.RULE_V1 = the pre-#10 rule every
+    sealed run trained under, RULE_V2 = the component rule); every evaluator
+    and every trainer that starts from S2 resolves its split through
+    lemma.data.split_binding (the run's recorded split certificate, or for
+    a pre-#10 run its v1 pin in configs/split_pins.yml; an unpinned run is
+    refused); and build_cache refuses a RULE_V2 split whose largest
+    component holds more than 10% of the rows unless --override-l12, which
+    the manifest records. The 10% is a guard so the rule cannot be used
+    silently, not a choice among the options above. Until the owner
+    decides, a new S2 run either waits or is built with an explicit
+    --override-l12 or --rule v1, and says which.

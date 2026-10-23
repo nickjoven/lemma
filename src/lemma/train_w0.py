@@ -9,7 +9,7 @@ auxiliary heads on the same predicted state:
            contributes -log P(cost >= cap) under the predicted Gaussian (Tobit),
            never a value.
 Transitions inherit the demonstrandum's module split; the gate (evaluate)
-is next-state MRR on module-held-out single-step transitions >= the better
+is next-state MRR on held-out (trained-split) single-step transitions >= the better
 of the offset and lexical baselines + 0.10, permutation control, cost head
 scored on uncensored rows and calibrated on censored ones. "JEPA" is not a
 word this repo uses until this gate is passed.

@@ -9,8 +9,8 @@ retrieval MRR among the held-out candidates for
     identity      predict z_before
     offset        predict z_before + mu_tactic     (mu fitted on train split)
     lexical       TF-IDF cosine of the before-goal text against candidate texts
-W0's gate is to beat offset AND lexical by >= 10 points on module-held-out
-transitions. A tactic whose offset baseline is within `translation_margin`
+W0's gate is to beat offset AND lexical by >= 10 points on held-out
+transitions (the S2 run's trained split; see the recorded split disclosure). A tactic whose offset baseline is within `translation_margin`
 of the best learned predictor is recorded as "translation" (no GPU spent).
 
 Energy targets (item 6): per goal state, the empirical closure rate over the
@@ -194,7 +194,7 @@ def main() -> int:
     energy_path.write_text("".join(json.dumps({"goal": k, **v}) + "\n" for k, v in energy.items()))
     results["energy_table_cid"] = ledger.ket_put(energy_path.read_bytes())
     results["gate_for_w0"] = {"beat_offset_by": 0.10, "beat_lexical_by": 0.10, "translation_margin": args.translation_margin,
-                              "note": "W0 must exceed max(mrr_offset, mrr_lexical) + 0.10 on module-held-out single-step transitions; tactics whose offset MRR is within the margin of W0 are 'translation' and get no GPU"}
+                              "note": "W0 must exceed max(mrr_offset, mrr_lexical) + 0.10 on held-out single-step transitions (the trained split, disclosed under 'split'); tactics whose offset MRR is within the margin of W0 are 'translation' and get no GPU"}
 
     cfg_cid = ledger.ket_put_json({"s2_run": args.s2_run, "max_seq": args.max_seq, "max_candidates": args.max_candidates, "seed": args.seed})
     rec = ledger.RunRecord(
