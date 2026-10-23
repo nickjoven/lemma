@@ -62,15 +62,23 @@ def equivalence_pairs_for(run) -> tuple[dict[str, list[Pair]], list, "split_bind
     """(pairs by split, declaration rows, Binding) under the split `run`
     trained against (split_binding.resolve; for training, the S2 init run)."""
     rows, binding = split_binding.resolve_corpus(run)
-    return equivalence_pairs_by_split(rows, binding.assignment, iter_iff_pairs()), rows, binding
+    pairs = equivalence_pairs_by_split(rows, binding.assignment, iter_iff_pairs(), binding.rule_id)
+    return pairs, rows, binding
 
 
-def equivalence_pairs_by_split(rows, assign: dict[str, str], iff_pairs) -> dict[str, list[Pair]]:
-    """Iff sides + same-lock dedup pairs, assigned to the module-level split.
-    A dedup pair whose two members fall in different splits is dropped (leak)."""
+def equivalence_pairs_by_split(rows, assign: dict[str, str], iff_pairs,
+                               rule: str = splits.CURRENT_RULE) -> dict[str, list[Pair]]:
+    """Iff sides + same-lock dedup pairs. An Iff pair takes its module's split
+    under `rule` (splits.module_split_fn: under the component rule, the split
+    of the module's declarations; an Iff pair of a module with no declaration
+    is excluded, never guessed). A dedup pair whose two members fall in
+    different splits is dropped (leak)."""
     out: dict[str, list[Pair]] = {s: [] for s in splits.SPLITS}
+    split_of_module = splits.module_split_fn(rule, rows, assign)
     for r in iff_pairs:
-        out[splits.split_of_area(r["module"])].append((r["lhs"], r["rhs"], r["module"], "iff"))
+        s = split_of_module(r["module"])
+        if s is not None:
+            out[s].append((r["lhs"], r["rhs"], r["module"], "iff"))
     by_lock: dict[str, list] = defaultdict(list)
     for r in rows:
         by_lock[r.lock].append(r)

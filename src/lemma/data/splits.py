@@ -193,6 +193,30 @@ def component_guard(rows: list[DeclarationRow], max_fraction: float = GIANT_COMP
     return stats
 
 
+def module_split_fn(rule: str, rows: list[DeclarationRow], assignment: dict[str, str]):
+    """module -> split (or None) for items keyed by module rather than by
+    declaration, such as Iff pairs (rule 4).
+
+    RULE_V2: the split of the module's component, i.e. of every declaration
+    in it, so an Iff pair lands with its module's declarations. Using
+    split_of_area(module) instead (as train_s5 did) put a pair in a
+    multi-module component in its module's OWN hash split while that
+    module's declarations followed the component key: a leak (review of
+    #10). A module with no declaration in the corpus gets None (excluded).
+    RULE_V1: split_of_area(module), which is what every v1 run trained under;
+    kept so those runs are evaluated against their own split, leak and all
+    (v1 can also split a module, so it has no single module split)."""
+    rule = rule_id(rule)
+    if rule == RULE_V1:
+        return split_of_area
+    by_module: dict[str, str] = {}
+    for row in rows:
+        s = assignment[row.name]
+        if by_module.setdefault(row.module, s) != s:
+            raise ValueError(f"module {row.module} is split across {by_module[row.module]} and {s}")
+    return by_module.get
+
+
 def component_stats(rows: list[DeclarationRow]) -> dict:
     """Disclosed with the manifest: how much the shared-lock joins coarsened
     the module partition. A large component is a warning that the split may

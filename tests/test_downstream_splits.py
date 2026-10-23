@@ -53,7 +53,7 @@ def test_no_entrypoint_recomputes_the_split():
         for node in ast.walk(ast.parse(path.read_text())):
             if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
                     and isinstance(node.func.value, ast.Name) and node.func.value.id == "splits"
-                    and node.func.attr in {"assign", "assign_v1", "assign_under"}):
+                    and node.func.attr in {"assign", "assign_v1", "assign_under", "split_of_area"}):
                 pytest.fail(f"{rel}:{node.lineno} calls splits.{node.func.attr}")
 
 
@@ -139,3 +139,21 @@ def test_every_run_record_names_its_split(fname):
     tree = ast.parse((SRC / fname).read_text())
     inputs = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "RunInputs"]
     assert inputs and all(any(k.arg == "split_manifest_cid" for k in n.keywords) for n in inputs), fname
+
+
+def test_s5_iff_pairs_land_with_their_modules_declarations():
+    """Finding 3: in a multi-module component an Iff pair used its module's
+    own hash split while that module's declarations used the component's."""
+    from lemma.train_s5 import equivalence_pairs_by_split
+    rows = rule_change_rows()
+    assign = splits.assign(rows)
+    b_module = next(r.module for r in rows if r.name == "b_other")
+    assert splits.split_of_area(b_module) == "train" and assign["b_other"] == "test"   # the leak's precondition
+    iff = [{"lhs": "P", "rhs": "Q", "module": b_module}, {"lhs": "R", "rhs": "S", "module": "Mathlib.NotInCorpus"}]
+    out = equivalence_pairs_by_split(rows, assign, iff, splits.RULE_V2)
+    where = {s for s, ps in out.items() for p in ps if p[3] == "iff"}
+    assert where == {"test"}, "the Iff pair must share its module's declarations' split"
+    assert sum(p[3] == "iff" for ps in out.values() for p in ps) == 1, "a module with no declarations is excluded"
+    # a v1 run is reproduced as it trained (module hash), not silently re-split
+    v1 = equivalence_pairs_by_split(rows, splits.assign_v1(rows), iff[:1], splits.RULE_V1)
+    assert [p[3] for p in v1["train"] if p[3] == "iff"] == ["iff"]
