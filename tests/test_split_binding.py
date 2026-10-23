@@ -294,6 +294,11 @@ def test_pinned_v1_over_the_recorded_corpus_resolves(tmp_path, monkeypatch, ket_
     ident = write_corpus(tmp_path / "corpora", monkeypatch, [rows[:3], rows[3:]])
     pin = {"split_rule": splits.RULE_V1, "declarations_shards_blake3": ident["shards_blake3"]}
     monkeypatch.setattr(split_binding, "PINS_PATH", pins(tmp_path, {"s2-legacy": pin}))
+    from lemma.data import corpus
+
+    def no_second_read(*a, **k):
+        raise AssertionError("resolve_corpus must rebuild over the rows read_declarations verified, not re-read them")
+    monkeypatch.setattr(corpus, "iter_rows", no_second_read)
     got, b = split_binding.resolve_corpus(run())
     assert [r.name for r in got] == [r.name for r in rows]
     assert b.assignment == splits.assign_v1(rows) and b.binding == "pinned_rule_reconstructed"
