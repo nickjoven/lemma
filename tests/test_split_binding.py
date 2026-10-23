@@ -304,6 +304,30 @@ def test_pinned_v1_over_the_recorded_corpus_resolves(tmp_path, monkeypatch, ket_
     assert b.assignment == splits.assign_v1(rows) and b.binding == "pinned_rule_reconstructed"
 
 
+def test_read_declarations_splits_lines_as_iter_rows_does(tmp_path, monkeypatch):
+    """Third review of #10: read_declarations split shard bytes with
+    str.splitlines(), which also breaks on U+2028, U+2029, U+0085 and other
+    separators that JSON allows raw inside a string, so a row carrying one
+    failed to parse (or parsed differently) there while iter_rows read it
+    fine. Both now split on newline only and decode UTF-8."""
+    from lemma.data import corpus
+    rows = rule_change_rows()
+    write_corpus(tmp_path / "corpora", monkeypatch, [rows])
+    shard = tmp_path / "corpora" / "declarations" / "declarations-0000.jsonl"
+    odd = DeclarationRow(name="odd", module="Mathlib.Odd", kind="theorem", canonical_type="T[odd]", lock="odd",
+                         docstring="line\u2028sep\x85next")
+    raw = odd.model_dump_json().encode()
+    assert "\u2028".encode() in raw and "\x85".encode() in raw, "fixture: the separators must be raw in the shard"
+    shard.write_bytes(shard.read_bytes() + raw + b"\r\n")
+    man = json.loads((tmp_path / "corpora" / "MANIFEST.yml").read_text())
+    import blake3
+    man["corpora"]["declarations"][0]["cid"] = blake3.blake3(shard.read_bytes()).hexdigest()
+    (tmp_path / "corpora" / "MANIFEST.yml").write_text(json.dumps(man))
+    got, _ = corpus.read_declarations()
+    assert got == list(corpus.iter_rows())
+    assert got[-1].docstring == "line\u2028sep\x85next" and len(got) == len(rows) + 1
+
+
 def test_reversed_row_order_under_a_pinned_v1_run_is_refused(tmp_path, monkeypatch, ket_store):
     rows = rule_change_rows()
     assert splits.assign_v1(rows[::-1]) != splits.assign_v1(rows), "fixture: reversing must change the v1 split"

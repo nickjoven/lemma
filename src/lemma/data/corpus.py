@@ -54,7 +54,7 @@ def iter_mutants(corpus: str = "mutants", verify: bool = True) -> Iterator[Mutan
         path = CORPORA / entry["file"]
         if verify:
             verify_shard(path, entry["cid"])
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     m = json.loads(line)
@@ -74,7 +74,7 @@ def iter_attempts(corpus: str = "attempts", verify: bool = True) -> Iterator[Att
         path = CORPORA / entry["file"]
         if verify:
             verify_shard(path, entry["cid"])
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     yield AttemptRow.model_validate(json.loads(line))
@@ -89,7 +89,7 @@ def iter_rows(corpus: str = "declarations", verify: bool = True) -> Iterator[Dec
         path = CORPORA / entry["file"]
         if verify:
             verify_shard(path, entry["cid"])
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     yield DeclarationRow.model_validate_json(line)
@@ -100,6 +100,15 @@ def shard_order_blake3(entries: list[dict]) -> str:
     verified, it fixes the exact row order iter_rows yields, which an
     order-dependent split rule (splits.RULE_V1) depends on."""
     return blake3.blake3("\n".join(e["cid"] for e in entries).encode()).hexdigest()
+
+
+def _lines(data: bytes) -> Iterator[str]:
+    """The lines iter_rows yields from the same bytes (text mode, UTF-8,
+    universal newlines): split on b"\\n" only, then drop a trailing "\\r".
+    str.splitlines() would also split on U+2028, U+2029, U+0085 and other
+    separators that JSON allows raw inside a string value."""
+    for raw in data.split(b"\n"):
+        yield raw.removesuffix(b"\r").decode("utf-8")
 
 
 def read_declarations(corpus: str = "declarations") -> tuple[list[DeclarationRow], dict]:
@@ -119,7 +128,7 @@ def read_declarations(corpus: str = "declarations") -> tuple[list[DeclarationRow
         actual = blake3.blake3(data).hexdigest()
         if actual != entry["cid"]:
             raise CorpusError(f"{entry['file']}: content hash {actual} != manifest CID {entry['cid']}")
-        rows.extend(DeclarationRow.model_validate_json(line) for line in data.decode().splitlines() if line.strip())
+        rows.extend(DeclarationRow.model_validate_json(line) for line in _lines(data) if line.strip())
     identity = {"corpus": corpus, "source_manifest_cid": (man.get("source") or {}).get("manifest_cid"),
                 "shards": len(shards), "shards_blake3": shard_order_blake3(shards)}
     return rows, identity
@@ -134,7 +143,7 @@ def _iter_shards(corpus: str, verify: bool):
         path = CORPORA / entry["file"]
         if verify:
             verify_shard(path, entry["cid"])
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             for line in f:
                 if line.strip():
                     yield line
