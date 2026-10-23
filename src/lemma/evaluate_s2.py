@@ -7,7 +7,9 @@ candidates both come from the test split THE CHECKPOINT WAS TRAINED AGAINST
 (split_binding.resolve: the certificate its train record names, or, for a run
 sealed before #10, a rebuild under its pinned rule that must reproduce the
 training cache's per-split counts; a fresh assignment under today's rule is
-not held out relative to an older run, and is never used), and no lock of
+not held out relative to an older run, and is used only if the caller passes
+--expect-split-rule for a run with no certificate and no pin, an escape hatch
+disclosed as split_pin_source "explicit"), and no lock of
 that split occurs in train or val (lemma #5: the earlier evaluator
 sampled the whole corpus, so its number is full-corpus duplicate retrieval).
 Controls, per the doctrine that a metric without its controls is not citable:
@@ -203,7 +205,9 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=1337)
     ap.add_argument("--split", default="test", choices=["test", "val"], help="held-out split to evaluate on")
     ap.add_argument("--expect-split-rule", default=None, choices=sorted(splits.ASSIGNERS),
-                    help="the split rule the run trained under; must agree with its record or pin")
+                    help="the split rule the run trained under; must agree with its record or pin. On a run with "
+                         "neither it is an escape hatch, taken on trust (v2 only), disclosed as split_pin_source "
+                         "explicit, and the L-12 guard is not applied")
     ap.add_argument("--cache-report", type=Path, default=REPO_ROOT / "corpora" / "cache" / "cache-report.json",
                     help="the training cache's report; its per-split counts must match (required)")
     ap.add_argument("--split-manifest", type=Path, default=None,
@@ -212,7 +216,8 @@ def main() -> int:
     src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
 
     train_rec = ledger.citable(args.run)
-    # the split the checkpoint trained against, by evidence, over the verified corpus it recorded;
+    # the split the checkpoint trained against, by evidence, over the declarations shards MANIFEST.yml
+    # lists (its source CID must equal the run's corpus label; see split_binding for exactly what binds);
     # refuses rather than guessing (review of #10)
     rows, binding = split_binding.resolve_corpus(train_rec, expect_rule=args.expect_split_rule)
     cache_counts = check_cache_report(args.cache_report, binding.assignment)

@@ -219,12 +219,14 @@
     and refuses unless the rebuild reproduces the per-split counts in
     corpora/cache/cache-report.json. Matching counts are necessary, not
     sufficient: a different assignment with the same counts would pass.
-    Because v1 depends on row order, the rebuild is also refused unless the
-    corpus is the one the run recorded (corpora/MANIFEST.yml source CID =
-    its corpus_cids[0]), every shard verifies, and the shard order equals the
-    pin's declarations_shards_blake3 (taken from MANIFEST.yml at the pinned
-    commit); a reordered corpus with equal counts no longer passes, but the
-    pin is code and corpus history, not something the run sealed. The
+    Because v1 depends on row order, the rebuild is also refused unless
+    corpora/MANIFEST.yml's source.manifest_cid equals the run's
+    corpus_cids[0] (a label comparison: MANIFEST.yml is not hashed, and its
+    shard CIDs are not checked against the quod manifest it names), every
+    shard hashes to the CID MANIFEST.yml lists, and the shard order equals
+    the pin's declarations_shards_blake3 (taken from MANIFEST.yml at the
+    pinned commit); a reordered corpus with equal counts no longer passes,
+    but the pin is code and corpus history, not something the run sealed. The
     cache's split-manifest.json is not independent evidence (build_cache
     writes it and the report in one invocation, and a rebuild overwrites
     both), so it is read only when passed with --split-manifest, and then
@@ -309,18 +311,30 @@
     hub locks (a lock shared by more than K modules) from the join; or
     exclude the giant component from val/test. Then seal the component
     statistics with the next split manifest. Until decided, evaluators take
-    the split a checkpoint was trained against, never a fresh assignment.
+    the split a checkpoint was trained against, never a fresh assignment
+    (except through the explicit --expect-split-rule escape hatch below).
     Implemented in the review of #10 (the decision itself is NOT made):
     split rules are versioned (splits.RULE_V1 = the pre-#10 rule every
     sealed run trained under, RULE_V2 = the component rule); every evaluator
     and every trainer that starts from S2 resolves its split through
     lemma.data.split_binding (the run's recorded split certificate, or for
-    a pre-#10 run its v1 pin in configs/split_pins.yml; an unpinned run is
-    refused). For a pre-#10 run (every sealed S2, S3, S4, S5 and W0 run)
-    the split is reconstructed under the pinned rule over the verified
-    recorded corpus (MANIFEST source CID = the run's corpus_cids[0], every
-    shard verified, shard order = the pin's declarations_shards_blake3, or
-    refused), and that reconstruction is the only link between the eval
+    a pre-#10 run its v1 pin in configs/split_pins.yml; a run with neither
+    is refused unless evaluate_s2 --expect-split-rule names its rule, an
+    escape hatch taken on trust, v2 only, disclosed as split_pin_source
+    explicit). For a pre-#10 run (every sealed S2, S3, S4, S5 and W0 run)
+    the split is reconstructed under the pinned rule over the declarations
+    shards MANIFEST.yml lists (refused unless MANIFEST.yml's
+    source.manifest_cid = the run's corpus_cids[0], every shard hashes to
+    its MANIFEST.yml CID, and the shard order = the pin's
+    declarations_shards_blake3). The source-CID check compares labels only:
+    MANIFEST.yml is not hashed and its shard CIDs are not checked against
+    the quod manifest it names; the pinned shard order is what fixes the
+    rows. A certificate run is bound by per-split name digests (split
+    membership, not row content); an explicit-rule rebuild is bound by the
+    label check alone and skips the L-12 guard. Only the declarations
+    corpus is checked: mutants, attempts, transitions and goals corpora are
+    read from the current MANIFEST.yml and not compared with the CIDs a run
+    records. That reconstruction is the only link between the eval
     split and the training split: no split the run sealed confirms it. For
     s3-smoke, s3-gloss-20260910-174141 (code_git 022fe90, no train_s3.py)
     and s5-smoke (code_git a3b3c5a, no train_s5.py) the tree provably did

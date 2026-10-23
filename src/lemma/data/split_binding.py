@@ -10,26 +10,42 @@ that checkpoint's pretraining), resolves the split here instead:
      certificate is read from the store by CID, the assignment is rebuilt
      under the rule it names, and the rebuilt split must match its per-split
      name digests exactly. binding = "train_record_cid".
-  2. The run records none (every run sealed before #10): the rule must be
-     PINNED, in configs/split_pins.yml (reviewed, provenance-covered) or by
-     an explicit expected-rule argument. Anything else is refused. The
-     assignment is rebuilt under the pinned rule; binding =
-     "pinned_rule_reconstructed". This is weaker than (1): the pin says which
-     code computed the split (by commit), and nothing the run sealed can
-     confirm the rebuilt rows; callers that have more evidence (evaluate_s2's
-     cache report) check it, and the binding is recorded with every number.
+  2. The run records none (every run sealed before #10): the rule comes from
+     a pin in configs/split_pins.yml (reviewed, provenance-covered), or from
+     an explicit expected-rule argument (evaluate_s2 --expect-split-rule).
+     With neither, the run is refused. The assignment is rebuilt under that
+     rule; binding = "pinned_rule_reconstructed". This is weaker than (1):
+     the pin says which code computed the split (by commit), and nothing the
+     run sealed can confirm the rebuilt rows; callers that have more
+     evidence (evaluate_s2's cache report) check it, and the binding is
+     recorded with every number. An explicit rule on an unpinned run is an
+     escape hatch, not evidence: it is taken on the caller's word, disclosed
+     as pin_source "explicit", and only RULE_V2 can be given this way (v1
+     needs the pin's shard order, below).
 
-In both cases the rows must be the corpus the run trained on: the corpus
-MANIFEST's source CID must be the run's recorded corpus_cids[0], every shard
-is verified, and for the order-dependent RULE_V1 the shard order must be the
-one the pin records (declarations_shards_blake3, from corpora/MANIFEST.yml at
-the pinned commit), since in-shard order is fixed by the shard CIDs. An
-explicit expected rule carries no shard order, so it cannot stand in for a v1
-pin. A v1 reconstruction is therefore "the split rebuilt under the pinned
-rule over the verified recorded corpus", not a split the run sealed.
-Entrypoints call resolve_corpus, which reads the rows and their identity
-together; resolve() trusts its caller that `rows` are the corpus `corpus`
-names.
+What ties the rows to the corpus the run trained on, exactly:
+  - every path: corpora/MANIFEST.yml's source.manifest_cid must equal the
+    run's corpus_cids[0] (a label train.py copied from its config), and
+    every declarations shard must hash to the CID MANIFEST.yml lists for
+    it. MANIFEST.yml itself is not hashed or pinned, and its shard CIDs are
+    not checked against the quod manifest whose CID it names, so the source
+    CID is a label that MANIFEST.yml asserts, not a verified identity.
+  - a pinned v1 run, additionally: the shard order must equal the pin's
+    declarations_shards_blake3 (from MANIFEST.yml at the pinned commit),
+    which, with each shard verified, fixes the rows and their order.
+  - a run with a certificate (1), additionally: split membership must match
+    the certificate's per-split name digests. That binds which names are in
+    which split, not the rows' content.
+  - an explicit rule on an unpinned run: the label check above only, and the
+    L-12 component guard (build_cache's) is not applied to the rebuild.
+Only the declarations corpus is checked. The mutants, attempts,
+transitions and goals corpora a downstream run reads come from the current
+MANIFEST.yml and are not compared with the CIDs the run recorded.
+A v1 reconstruction is therefore "the split rebuilt under the pinned rule
+over the declarations shards MANIFEST.yml lists, in the pinned order", not a
+split the run sealed. Entrypoints call resolve_corpus, which reads the rows
+and their identity together; resolve() trusts its caller that `rows` are the
+corpus `corpus` names.
 
 In both cases the resolved split is sealed as a certificate and its CID is
 returned, so a downstream run records it as its own split_manifest_cid. A
@@ -93,8 +109,10 @@ def put_certificate(cert: dict) -> str:
 
 
 def check_corpus(run: ledger.RunRecord, corpus: dict) -> None:
-    """The rows' corpus must be the one the run recorded (corpus_cids[0] is
-    the declarations corpus, inherited from S2 by every later stage)."""
+    """MANIFEST.yml's source CID must equal the run's corpus_cids[0] (the
+    declarations corpus label, inherited from S2 by every later stage). This
+    compares two labels; see the module docstring for what else binds the
+    rows."""
     recorded = list(run.inputs.corpus_cids)
     source = corpus.get("source_manifest_cid")
     if not source or not recorded or recorded[0] != source:
