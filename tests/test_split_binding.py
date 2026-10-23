@@ -198,29 +198,80 @@ def test_component_guard_refuses_a_giant_component():
     assert splits.component_guard(rows, max_fraction=0.5)["largest_component_rows"] == 5
 
 
+# The stage trainer each pinned run's code_git must contain (s4v2-* records stage S4).
+STAGE_TRAINER = {"S2": "train.py", "S3": "train_s3.py", "S4": "train_s4.py", "S5": "train_s5.py", "W0": "train_w0.py"}
+# Runs whose sealed code_git provably did NOT hold the trainer that ran (each
+# was started minutes before its trainer was first committed, on a tree that
+# was therefore not code_git). Documented in configs/split_pins.yml and
+# OPEN.yml L-9; their v1 pin rests on src/lemma/data being unchanged between
+# code_git and the trainer's first commit, whose code calls splits.assign.
+TRAINER_ABSENT_AT_CODE_GIT = {
+    "s3-smoke": "e596d94",                   # train_s3.py first committed at e596d94
+    "s3-gloss-20260910-174141": "e596d94",
+    "s5-smoke": "396ead3",                   # train_s5.py first committed at 396ead3
+}
+
+
+def _has_commit(commit: str) -> bool:
+    return subprocess.run(["git", "-C", str(REAL_REPO), "cat-file", "-e", f"{commit}^{{commit}}"],
+                          capture_output=True).returncode == 0
+
+
+def _tree_has(spec: str) -> bool:
+    return subprocess.run(["git", "-C", str(REAL_REPO), "cat-file", "-e", spec], capture_output=True).returncode == 0
+
+
 def test_real_pins_name_v1_and_match_code_history():
     """Every pin's evidence is re-checked against history: its code_git is the
     code_git its train record sealed, the splits.py blob at that commit is the
-    pinned v1 blob, and the shard order and corpus source at that commit are
-    the pinned ones. A commit missing from a full clone fails."""
+    pinned v1 blob, the shard order and corpus source at that commit are the
+    pinned ones, and the stage's trainer exists at that commit (except the
+    documented TRAINER_ABSENT_AT_CODE_GIT runs, for which src/lemma/data must be
+    unchanged from code_git to the trainer's first commit, and that commit's
+    trainer must call splits.assign). Every pin is checked; a commit absent
+    from a shallow clone skips only the pins that need it, and is reported. A
+    commit missing from a full clone fails."""
     from lemma.data import corpus
     entries = split_binding.load_pins()
     lines = [json.loads(l) for l in (REAL_REPO / "runs" / "ledger.jsonl").read_text().splitlines() if l.strip()]
     trained = {r["run_id"]: r for r in lines if r["kind"] == "train" and r["status"] == "completed"}
     assert set(trained) <= set(entries), f"sealed train runs without a pin: {sorted(set(trained) - set(entries))}"
     assert set(entries) <= set(trained), f"pins for runs with no completed train record: {sorted(set(entries) - set(trained))}"
+    assert set(TRAINER_ABSENT_AT_CODE_GIT) <= set(entries)
+    missing: dict[str, list[str]] = {}
     for run_id, pin in entries.items():
         rec = trained[run_id]
         assert pin["split_rule"] == splits.RULE_V1 and pin["splits_py_blob"] in V1_BLOBS, run_id
         assert pin["code_git"] == rec["inputs"]["code_git"], f"{run_id}: pin code_git is not the sealed one"
+        first = TRAINER_ABSENT_AT_CODE_GIT.get(run_id)
+        absent = [c for c in (pin["code_git"], first) if c and not _has_commit(c)]
+        if absent:
+            missing[run_id] = absent
+            continue
         blob = subprocess.run(["git", "-C", str(REAL_REPO), "rev-parse", f"{pin['code_git']}:src/lemma/data/splits.py"],
                               capture_output=True, text=True).stdout.strip()
-        if not blob:
-            git_object(pin["code_git"])     # fails in a full clone, skips in a shallow one
         assert blob == pin["splits_py_blob"], run_id
         man = yaml.safe_load(git_object(f"{pin['code_git']}:corpora/MANIFEST.yml"))
         assert corpus.shard_order_blake3(man["corpora"]["declarations"]) == pin["declarations_shards_blake3"], run_id
         assert man["source"]["manifest_cid"] == rec["inputs"]["corpus_cids"][0], run_id
+        trainer = "train_s4v2.py" if run_id.startswith("s4v2-") else STAGE_TRAINER[rec["stage"]]
+        at_code_git = _tree_has(f"{pin['code_git']}:src/lemma/{trainer}")
+        if first is None:
+            assert at_code_git, f"{run_id}: {trainer} does not exist at its code_git {pin['code_git'][:7]}"
+            continue
+        assert not at_code_git, f"{run_id}: listed as an exception, but {trainer} exists at its code_git"
+        assert subprocess.run(["git", "-C", str(REAL_REPO), "merge-base", "--is-ancestor", pin["code_git"], first]).returncode == 0
+        diff = subprocess.run(["git", "-C", str(REAL_REPO), "diff", "--name-only", pin["code_git"], first, "--",
+                               "src/lemma/data"], capture_output=True, text=True, check=True).stdout.strip()
+        assert diff == "", f"{run_id}: src/lemma/data changed between code_git and {first}: {diff}"
+        assert "splits.assign(" in git_object(f"{first}:src/lemma/{trainer}"), run_id
+    if missing:
+        shallow = subprocess.run(["git", "-C", str(REAL_REPO), "rev-parse", "--is-shallow-repository"],
+                                 capture_output=True, text=True).stdout.strip()
+        msg = "; ".join(f"{r}: {', '.join(c[:7] for c in cs)}" for r, cs in sorted(missing.items()))
+        if shallow != "true":
+            pytest.fail(f"pin evidence missing from a full clone: {msg}")
+        pytest.skip(f"checked {len(entries) - len(missing)} of {len(entries)} pins; absent from this shallow clone: {msg}")
 
 
 def _cache(tmp_path, rows, rule=splits.RULE_V2, counts=None, rule_id=True):

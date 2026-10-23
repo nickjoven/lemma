@@ -13,9 +13,21 @@
 # whose body is AST-equal to splits.assign_v1's, docstring aside (b0d106c only
 # adds assign_transitions). Limit: these records predate the dirty-tree check
 # (L-10), so that the tree matched code_git is not verified; a pin is a
-# statement about code and corpus history, not a sealed split.
-# tests/test_split_binding.py re-checks all of it against git history (and
-# fails, not skips, in a full clone that lacks a commit).
+# statement about code and corpus history, not a sealed split. For three runs
+# the tree provably did NOT match code_git: s3-smoke and
+# s3-gloss-20260910-174141 (code_git 022fe90, which has no train_s3.py) and
+# s5-smoke (code_git a3b3c5a, which has no train_s5.py). Each started minutes
+# before its trainer's first commit (e596d94, 396ead3), so it ran an
+# uncommitted trainer. The v1 pin is still the best evidence for them:
+# src/lemma/data is byte-identical from 022fe90 to e596d94 and from a3b3c5a to
+# 396ead3, and the first committed train_s3.py (e596d94, gloss_pairs) and
+# train_s5.py (396ead3) take their split from splits.assign, which at those
+# commits is this v1 rule. That the uncommitted trainer did the same is
+# inferred, not recorded.
+# tests/test_split_binding.py re-checks all of it against git history,
+# including that every other pin's stage trainer exists at its code_git (it
+# fails, not skips, in a full clone that lacks a commit; a shallow clone skips
+# only the pins whose commits it lacks, and names them).
 #
 # Owed (OPEN.yml L-9): the s2 cache's split-manifest.json on the GPU box, if it
 # is still the one the checkpoint trained on, should be checked against the
@@ -31,11 +43,13 @@ runs:
     splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
     declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
   s3-smoke:
+    # code_git has no train_s3.py; ran before its first commit e596d94 (see header)
     split_rule: v1-module-lock-follows-first
     code_git: 022fe9026448f787e316ec9aa3978133e9dc8d1f
     splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
     declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
   s3-gloss-20260910-174141:
+    # code_git has no train_s3.py; ran before its first commit e596d94 (see header)
     split_rule: v1-module-lock-follows-first
     code_git: 022fe9026448f787e316ec9aa3978133e9dc8d1f
     splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
@@ -51,6 +65,7 @@ runs:
     splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
     declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
   s5-smoke:
+    # code_git has no train_s5.py; ran before its first commit 396ead3 (see header)
     split_rule: v1-module-lock-follows-first
     code_git: a3b3c5a88201d6f6a5f99ca4c6281acf8949fda4
     splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e

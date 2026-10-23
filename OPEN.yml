@@ -317,7 +317,16 @@
     recorded corpus (MANIFEST source CID = the run's corpus_cids[0], every
     shard verified, shard order = the pin's declarations_shards_blake3, or
     refused), and that reconstruction is the only link between the eval
-    split and the training split: no split the run sealed confirms it. A
+    split and the training split: no split the run sealed confirms it. For
+    s3-smoke, s3-gloss-20260910-174141 (code_git 022fe90, no train_s3.py)
+    and s5-smoke (code_git a3b3c5a, no train_s5.py) the tree provably did
+    not match code_git: each ran an uncommitted trainer minutes before its
+    first commit (e596d94, 396ead3). Their v1 pin is still the best
+    evidence: src/lemma/data is unchanged from code_git to that commit, and
+    the trainer as first committed takes its split from splits.assign (v1
+    there); that the uncommitted trainer did the same is inferred. The pin
+    test checks that every other pin's stage trainer exists at its code_git
+    and lists these three as the only exceptions. A
     new run trained on top of such a run records a certificate that carries
     the pin's provenance, and it and its eval report the weakest link
     (split_manifest_binding = pinned_rule_reconstructed, split_pinned_run)
