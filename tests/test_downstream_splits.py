@@ -1,7 +1,17 @@
 """Review of #10, finding 2: S3/S4/S4v2/S5/W0 evaluators (and the trainers
 that build on S2) used to call splits.assign() at run time, so the #6 rule
 change silently moved rows a sealed checkpoint trained on into its test
-split. They now take the split the run trained against (split_binding)."""
+split. They now take the split the run trained against (split_binding).
+
+The AST checks here (split_violations, the disclosure / RunInputs checks, and
+resolve-before-load) are lint-style guards against ACCIDENTAL regressions:
+they catch an assigner reached directly, through a simple alias or
+from-import of the splits module, a getattr with a literal name, or
+ASSIGNERS indexing. They are not a proof against deliberate bypass; the third
+review of #10 got past them with vars(splits)['assign'], getattr with a
+concatenated string, importlib, and a one-level helper wrapping load_file.
+splits.module_split_fn is not in ASSIGNERS: train_s5 calls it with the
+resolved assignment, and under RULE_V1 it returns split_of_area by design."""
 
 import ast
 import json
@@ -44,7 +54,7 @@ def moved(rows):
     return out
 
 
-ASSIGNERS = {"assign", "assign_v1", "assign_under", "split_of_area", "_components", "ASSIGNERS"}
+ASSIGNERS = {"assign", "assign_v1", "assign_under", "split_of_area", "_components", "manifest", "ASSIGNERS"}
 
 
 def _dotted(node) -> str:
@@ -114,6 +124,7 @@ def test_no_entrypoint_recomputes_the_split():
     "from .data import splits\nsplits.ASSIGNERS.get(r)(rows)\n",
     "from .data import split_binding\nsplit_binding.resolve(run, rows, corpus={})\n",
     "from .data.split_binding import resolve\n",
+    "from .data import splits\nsplits.manifest(rows)['assignment']\n",
 ])
 def test_routes_around_split_binding_are_caught(snippet):
     assert split_violations(ast.parse(snippet))

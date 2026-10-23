@@ -263,7 +263,11 @@
     is reproduced. Every entrypoint runs preflight_source before its compute
     and passes the result to start_run, which refuses if the source changed
     in between; runs outside a git checkout, and code_git = "no-git", are
-    refused.
+    refused. That every entrypoint is wired this way is checked by
+    lint-style AST tests (tests/test_provenance_coverage.py) that catch
+    direct and simply aliased forms only: they guard against accidental
+    regressions, not deliberate bypass (the third review of #10 got past
+    them, e.g. by mutating the preflight state or wrapping load_file).
 - id: L-11
   severity: high
   status: fix-pending (BestPair saves the online model and the EMA target together at each best step; a role-labelled checkpoint manifest is sealed; the released run is not rerun)

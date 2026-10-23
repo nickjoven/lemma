@@ -8,7 +8,17 @@ start_run or finish_run), the ledger API may only be called directly as
 ledger.start_run(...) / ledger.finish_run(...) (an alias or a from-import
 would hide a call from these checks, so it fails), and preflight= must be
 the variable the same function bound from ledger.preflight_source(), not
-None or a constant."""
+None or a constant.
+
+These are lint-style guards against ACCIDENTAL regressions (a new
+entrypoint that forgets preflight, an aliased or from-imported ledger call,
+preflight=None), not a proof against deliberate bypass: the third review of
+#10 got past them by mutating the preflight state after binding it, wrapping
+load_file in a helper one level down, reaching the API through importlib or a
+concatenated getattr string, and re-reading a corpus with raw open(). The
+runtime check is start_run comparing the tree with the preflight state it
+is handed (which the caller could alter); these tests only catch the
+straightforward ways of forgetting to call or wire it."""
 
 import ast
 from pathlib import Path
