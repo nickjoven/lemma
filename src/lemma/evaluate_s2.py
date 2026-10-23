@@ -3,10 +3,12 @@
 The plan's falsifiable gate for the S2 encoder: mean-pooled embeddings must
 retrieve exact-duplicate statements (declarations sharing a LOCK — the same
 theorem stated under two names) at MRR >= 0.95, on HELD-OUT data: queries and
-candidates both come from the test split OF THE SPLIT MANIFEST THE CHECKPOINT
-WAS TRAINED AGAINST (the training cache's split-manifest.json, by CID; a fresh
-assignment under today's rule is not held out relative to an older run), and
-no lock of that split occurs in train or val (lemma #5: the earlier evaluator
+candidates both come from the test split THE CHECKPOINT WAS TRAINED AGAINST
+(split_binding.resolve: the certificate its train record names, or, for a run
+sealed before #10, a rebuild under its pinned rule that must reproduce the
+training cache's per-split counts; a fresh assignment under today's rule is
+not held out relative to an older run, and is never used), and no lock of
+that split occurs in train or val (lemma #5: the earlier evaluator
 sampled the whole corpus, so its number is full-corpus duplicate retrieval).
 Controls, per the doctrine that a metric without its controls is not citable:
   positive  same-lock pairs -> should retrieve each other at rank ~1
@@ -37,6 +39,7 @@ from safetensors.torch import load_file
 from tokenizers import Tokenizer
 
 from . import ledger
+from .data import split_binding, splits
 from .data.corpus import CorpusError, encoder_text, iter_rows
 from .models.encoder import Encoder, EncoderConfig
 
@@ -67,29 +70,34 @@ def embed(enc: Encoder, tok: Tokenizer, texts: list[str], device: str, bs: int =
     return torch.cat(out)
 
 
-def trained_split(manifest_path: Path, recorded_cid: str | None, rows) -> tuple[dict[str, str], str, str]:
-    """The split assignment the checkpoint was trained against: the split
-    manifest its training cache was built from, taken by its bytes. Returns
-    (assignment, cid, rule). Refuses a manifest whose CID is not the one the
-    train record names (when it names one), one whose per-split counts differ
-    from the cache report beside it, and one that does not cover every corpus
-    row: each would make \"held-out\" a guess."""
+def check_cache_report(report_path: Path, assignment: dict[str, str]) -> dict[str, int]:
+    """The training cache's per-split sequence counts must be the resolved
+    split's. A missing report is an error, not a skipped check (review of
+    #10): for a pinned-rule rebuild these counts are the only evidence tying
+    the rebuild to the cache the checkpoint read, and the unigram baseline
+    below reads that cache too."""
+    if not report_path.is_file():
+        raise CorpusError(f"{report_path} is missing: the split cannot be checked against the training cache")
+    want = {s: v["sequences"] for s, v in json.loads(report_path.read_text())["splits"].items()}
+    got = {s: sum(1 for v in assignment.values() if v == s) for s in want}
+    if got != want:
+        raise CorpusError(f"the resolved split's counts {got} differ from the training cache {want}")
+    return want
+
+
+def check_manifest_file(manifest_path: Path, binding: split_binding.Binding) -> str:
+    """Optional extra evidence: a split-manifest.json the owner believes the
+    checkpoint trained against must name the resolved rule and hold exactly
+    the resolved assignment. Returns its BLAKE3."""
     data = manifest_path.read_bytes()
-    cid = blake3.blake3(data).hexdigest()
-    if recorded_cid is not None and recorded_cid != cid:
-        raise CorpusError(f"split manifest {manifest_path} hashes to {cid}, but the train run records {recorded_cid}")
     manifest = json.loads(data)
-    assign = manifest["assignment"]
-    report = manifest_path.with_name("cache-report.json")
-    if report.exists():
-        want = {s: v["sequences"] for s, v in json.loads(report.read_text())["splits"].items()}
-        got = {s: sum(1 for v in assign.values() if v == s) for s in want}
-        if got != want:
-            raise CorpusError(f"split manifest counts {got} differ from the training cache {want}")
-    missing = [r.name for r in rows if r.name not in assign]
-    if missing:
-        raise CorpusError(f"{len(missing)} corpus rows are not in the split manifest (e.g. {missing[:3]})")
-    return assign, cid, manifest.get("rule", "?")
+    rule = splits.rule_id(manifest.get("rule_id") or manifest.get("rule", "?"))
+    if rule != binding.rule_id:
+        raise CorpusError(f"{manifest_path} was built under {rule}, but the run trained under {binding.rule_id}")
+    if manifest["assignment"] != binding.assignment:
+        diff = sum(1 for k, v in binding.assignment.items() if manifest["assignment"].get(k) != v)
+        raise CorpusError(f"{manifest_path} disagrees with the resolved split on {diff} rows")
+    return blake3.blake3(data).hexdigest()
 
 
 def heldout_pool(rows, assign: dict[str, str], n_groups: int, n_distractors: int,
@@ -194,21 +202,28 @@ def main() -> int:
     ap.add_argument("--distractors", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=1337)
     ap.add_argument("--split", default="test", help="held-out split to evaluate on")
-    ap.add_argument("--split-manifest", type=Path, default=REPO_ROOT / "corpora" / "cache" / "split-manifest.json",
-                    help="the split manifest the checkpoint's training cache was built from")
+    ap.add_argument("--expect-split-rule", default=None, choices=sorted(splits.ASSIGNERS),
+                    help="the split rule the run trained under; must agree with its record or pin")
+    ap.add_argument("--cache-report", type=Path, default=REPO_ROOT / "corpora" / "cache" / "cache-report.json",
+                    help="the training cache's report; its per-split counts must match (required)")
+    ap.add_argument("--split-manifest", type=Path, default=None,
+                    help="optional: a split-manifest.json to cross-check against the resolved split")
     args = ap.parse_args()
     src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
 
     train_rec = ledger.citable(args.run)
+    rows = list(iter_rows("declarations", verify=False))
+    # the split the checkpoint trained against, by evidence; refuses rather than guessing (review of #10)
+    binding = split_binding.resolve(train_rec, rows, expect_rule=args.expect_split_rule)
+    cache_counts = check_cache_report(args.cache_report, binding.assignment)
+    manifest_file_blake3 = check_manifest_file(args.split_manifest, binding) if args.split_manifest else None
+    assign = binding.assignment
+
     ckpt = REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors"
     tok = Tokenizer.from_file(str(REPO_ROOT / "runs" / "tokenizer" / "lean-unigram-32k.json"))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     enc = load_encoder(ckpt, tok.get_vocab_size(), device)
 
-    rows = list(iter_rows("declarations", verify=False))
-    assign, split_manifest_cid, split_rule = trained_split(args.split_manifest, train_rec.inputs.split_manifest_cid, rows)
-    if ledger.ket_put(args.split_manifest.read_bytes()) != split_manifest_cid:   # the manifest must resolve in the store
-        raise CorpusError("the split manifest's store CID differs from its BLAKE3")
     rng = random.Random(args.seed)
     members, distractors, pool_stats = heldout_pool(rows, assign, args.groups, args.distractors, rng, args.split)
     groups = pool_stats["groups"]
@@ -216,14 +231,12 @@ def main() -> int:
     texts = [encoder_text(r) for r in pool]
     locks = [r.lock for r in pool]
     modules = [r.module for r in pool]
-    # the identities behind every number, sealed: which statements were asked and offered
-    pool_stats["split_manifest_cid"] = split_manifest_cid
-    # how the manifest is tied to the checkpoint: by the CID the train run recorded,
-    # or (runs trained before train.py recorded one) only by the cache report's
-    # per-split counts, which a rebuilt cache would also satisfy
-    pool_stats["split_manifest_binding"] = ("train_record_cid" if train_rec.inputs.split_manifest_cid
-                                            else "cache_report_counts_only")
-    pool_stats["split_rule"] = split_rule
+    # the identities behind every number, sealed: which split, how it is tied
+    # to the checkpoint (train_record_cid, or pinned_rule_reconstructed for a
+    # run sealed before #10), and which statements were asked and offered
+    pool_stats.update(binding.disclosure())
+    pool_stats["cache_report_counts"] = cache_counts
+    pool_stats["split_manifest_file_blake3"] = manifest_file_blake3
     pool_stats["query_names_cid"] = ledger.ket_put_json([r.name for r in members])
     pool_stats["pool_names_cid"] = ledger.ket_put_json([r.name for r in pool])
 
@@ -294,7 +307,7 @@ def main() -> int:
                                 config_cid=train_rec.inputs.config_cid,
                                 init_checkpoint_cid=train_rec.checkpoint_cids[-1],
                                 code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin,
-                                split_manifest_cid=split_manifest_cid),
+                                split_manifest_cid=binding.certificate_cid),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
     ledger.start_run(rec, preflight=src_state)
     rec.calibration_record_cid = ledger.ket_put_json(calib)

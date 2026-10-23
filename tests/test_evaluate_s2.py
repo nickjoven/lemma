@@ -114,55 +114,6 @@ def test_duplicate_groups_available_is_counted_before_truncation():
     assert stats["groups"] == 1 and stats["duplicate_groups_available"] == available
 
 
-def _manifest(tmp_path, rows, assign, counts=None):
-    import json
-
-    import blake3
-    path = tmp_path / "split-manifest.json"
-    data = json.dumps({"rule": "fixture", "assignment": assign}).encode()
-    path.write_bytes(data)
-    counts = counts or {s: sum(1 for v in assign.values() if v == s) for s in splits.SPLITS}
-    (tmp_path / "cache-report.json").write_text(json.dumps({"splits": {s: {"sequences": n} for s, n in counts.items()}}))
-    return path, blake3.blake3(data).hexdigest()
-
-
-def test_trained_split_takes_the_manifest_the_checkpoint_trained_against(tmp_path):
-    from lemma.evaluate_s2 import trained_split
-    rows = fixture_rows()
-    assign = splits.assign(rows)
-    path, cid = _manifest(tmp_path, rows, assign)
-    got, got_cid, rule = trained_split(path, None, rows)
-    assert got == assign and got_cid == cid and rule == "fixture"
-    assert trained_split(path, cid, rows)[1] == cid
-
-
-def test_trained_split_refuses_a_manifest_the_train_record_does_not_name(tmp_path):
-    from lemma.evaluate_s2 import trained_split
-    rows = fixture_rows()
-    path, _ = _manifest(tmp_path, rows, splits.assign(rows))
-    with pytest.raises(CorpusError, match="train run records"):
-        trained_split(path, "0" * 64, rows)
-
-
-def test_trained_split_refuses_a_manifest_that_does_not_match_its_cache(tmp_path):
-    from lemma.evaluate_s2 import trained_split
-    rows = fixture_rows()
-    assign = splits.assign(rows)
-    path, _ = _manifest(tmp_path, rows, assign, counts={"train": 1, "val": 1, "test": 1})
-    with pytest.raises(CorpusError, match="differ from the training cache"):
-        trained_split(path, None, rows)
-
-
-def test_trained_split_refuses_a_manifest_that_does_not_cover_the_corpus(tmp_path):
-    from lemma.evaluate_s2 import trained_split
-    rows = fixture_rows()
-    assign = splits.assign(rows)
-    path, _ = _manifest(tmp_path, rows, assign)
-    rows.append(decl("new", "Mathlib.New.A", "newlock"))
-    with pytest.raises(CorpusError, match="not in the split manifest"):
-        trained_split(path, None, rows)
-
-
 def test_module_split_across_splits_is_disclosed():
     # a pre-#6 manifest can put one module's rows in two splits while keeping
     # every lock inside one split; the pool stats must say so
@@ -176,3 +127,181 @@ def test_module_split_across_splits_is_disclosed():
     _, _, stats = heldout_pool(rows, assign, 1000, 1000, random.Random(0))
     assert stats["modules_shared_with_other_splits"] == 1
     assert stats["modules_in_split"] == clean["modules_in_split"]
+
+
+# review of #10, finding 1: the split is resolved by evidence, the cache report is required,
+# and main() wires the preflight, the binding and the recorded CID
+
+def _report(path, assign, counts=None):
+    import json
+    counts = counts or {s: sum(1 for v in assign.values() if v == s) for s in splits.SPLITS}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"splits": {s: {"sequences": n} for s, n in counts.items()}}))
+    return path
+
+
+def test_missing_cache_report_is_an_error_not_a_skipped_check(tmp_path):
+    from lemma.evaluate_s2 import check_cache_report
+    rows = fixture_rows()
+    with pytest.raises(CorpusError, match="missing"):
+        check_cache_report(tmp_path / "cache-report.json", splits.assign(rows))
+
+
+def test_cache_report_counts_must_match_the_resolved_split(tmp_path):
+    from lemma.evaluate_s2 import check_cache_report
+    assign = splits.assign(fixture_rows())
+    assert check_cache_report(_report(tmp_path / "r.json", assign), assign)
+    with pytest.raises(CorpusError, match="differ from the training cache"):
+        check_cache_report(_report(tmp_path / "bad.json", assign, {"train": 1, "val": 1, "test": 1}), assign)
+
+
+def test_manifest_file_must_name_the_resolved_rule_and_hold_its_assignment(tmp_path):
+    import json
+
+    from lemma.data.split_binding import Binding
+    from lemma.evaluate_s2 import check_manifest_file
+    from test_split_binding import rule_change_rows
+    rows = rule_change_rows()
+    legacy = Binding(splits.assign_v1(rows), splits.RULE_V1, "cid", "pinned_rule_reconstructed")
+    # build_cache now overwrites the mutable manifest with a v2 one: refused for a v1 run
+    (tmp_path / "v2.json").write_text(json.dumps(splits.manifest(rows)))
+    with pytest.raises(CorpusError, match="built under v2"):
+        check_manifest_file(tmp_path / "v2.json", legacy)
+    # an older manifest that carries only the free-text rule is accepted iff it is the same split
+    old = {"rule": "module-area blake3, lock-follows-first, mutant-inherits-parent",
+           "assignment": splits.assign_v1(rows)}
+    (tmp_path / "v1.json").write_text(json.dumps(old))
+    assert len(check_manifest_file(tmp_path / "v1.json", legacy)) == 64
+    old["assignment"] = dict(old["assignment"], a_dup="test")
+    (tmp_path / "v1-edited.json").write_text(json.dumps(old))
+    with pytest.raises(CorpusError, match="disagrees with the resolved split on 1 rows"):
+        check_manifest_file(tmp_path / "v1-edited.json", legacy)
+
+
+class _Harness:
+    """Drive evaluate_s2.main() on CPU: a sealed fixture train run in a temp
+    ket store, a tiny word-level tokenizer and encoder, fixture corpus rows,
+    and a temp repo root holding the cache report and the train-cache ids."""
+
+    def __init__(self, tmp_path, monkeypatch, rows, *, split_manifest_cid=None, pins=None):
+        import json
+        import sys
+
+        import numpy as np
+        from tokenizers import Tokenizer, models, pre_tokenizers
+
+        from lemma import evaluate_s2, ledger
+        from lemma.data import split_binding
+        from lemma.models.encoder import Encoder, EncoderConfig
+        from lemma.schemas import RunInputs, RunRecord
+
+        self.ledger, self.rows = ledger, rows
+        texts = sorted({tok for r in rows for tok in r.canonical_type.split()})
+        vocab = {"<pad>": 0, "<unk>": 1, "<mask>": 2, "<s>": 3, **{t: i + 4 for i, t in enumerate(texts)}}
+        tok = Tokenizer(models.WordLevel(vocab, unk_token="<unk>"))
+        tok.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
+        monkeypatch.setattr(evaluate_s2.Tokenizer, "from_file", staticmethod(lambda _p: tok))
+
+        def small(vocab_size, **kw):
+            return EncoderConfig(vocab_size=vocab_size, max_seq=16, d_model=16, n_layers=1, n_heads=2, d_ff=32)
+        monkeypatch.setattr(evaluate_s2, "EncoderConfig", small)
+        self.loaded = []
+
+        def load_encoder(ckpt, vocab_size, device):
+            self.loaded.append(ckpt)
+            torch.manual_seed(1)
+            return Encoder(small(vocab_size)).eval()
+        monkeypatch.setattr(evaluate_s2, "load_encoder", load_encoder)
+        monkeypatch.setattr(evaluate_s2, "iter_rows", lambda *a, **k: iter(rows))
+        root = tmp_path / "evalroot"
+        (root / "corpora" / "cache").mkdir(parents=True)
+        np.save(root / "corpora" / "cache" / "declarations-train.ids.npy", np.arange(4, 4 + len(texts)) % len(vocab))
+        monkeypatch.setattr(evaluate_s2, "REPO_ROOT", root)
+        self.report = root / "corpora" / "cache" / "cache-report.json"
+        self.pins = tmp_path / "pins.yml"
+        self.pins.write_text(json.dumps({"runs": pins or {}}))
+        monkeypatch.setattr(split_binding, "PINS_PATH", self.pins)
+
+        self.train = RunRecord(run_id="s2-fixture", kind="train", stage="S2", started=ledger.now_iso(),
+                               inputs=RunInputs(corpus_cids=["corpus"], config_cid="cfg", code_git=ledger.git_head(),
+                                                mathlib_pin="pin", split_manifest_cid=split_manifest_cid))
+        self.train.checkpoint_cids.append(ledger.ket_put(b"fixture checkpoint"))
+        ledger.finish_run(self.train, {"masked_acc": 0.9})
+        self.preflights = []
+        real = ledger.preflight_source
+
+        def spy(*a, **k):
+            self.preflights.append(len(self.loaded))     # how many checkpoints were loaded before it
+            return real(*a, **k)
+        monkeypatch.setattr(ledger, "preflight_source", spy)
+        monkeypatch.setattr(sys, "argv", ["evaluate_s2", "--run", "s2-fixture", "--groups", "50",
+                                          "--distractors", "50"])
+
+    def run(self):
+        from lemma import evaluate_s2
+        return evaluate_s2.main()
+
+    def eval_record(self):
+        import json
+        recs = [r for r in self.ledger.read_ledger() if r.run_id == "s2-eval-s2-fixture" and r.status != "running"]
+        assert len(recs) == 1
+        return recs[0], json.loads(self.ledger.ket_get(recs[0].metrics_cid))["metrics"]
+
+
+def test_main_refuses_an_unpinned_legacy_run_before_loading_anything(tmp_path, monkeypatch, ket_store):
+    from lemma.data.split_binding import SplitBindingError
+    h = _Harness(tmp_path, monkeypatch, fixture_rows())
+    _report(h.report, splits.assign(fixture_rows()))
+    with pytest.raises(SplitBindingError, match="no split-rule pin"):
+        h.run()
+    assert h.loaded == [] and h.preflights == [0]
+
+
+def test_main_on_a_pinned_legacy_run_records_the_v1_binding(tmp_path, monkeypatch, ket_store):
+    import json
+    rows = fixture_rows()
+    h = _Harness(tmp_path, monkeypatch, rows, pins={"s2-fixture": {"split_rule": splits.RULE_V1}})
+    _report(h.report, splits.assign_v1(rows))
+    h.run()
+    rec, metrics = h.eval_record()
+    assert h.preflights == [0], "preflight must run once, before the checkpoint is loaded"
+    held = metrics["heldout"]
+    assert held["split_manifest_binding"] == "pinned_rule_reconstructed"
+    assert held["split_rule"] == splits.RULE_V1 and held["split_pin_source"] == "configs/pins.yml"
+    assert rec.inputs.split_manifest_cid == held["split_manifest_cid"]
+    cert = json.loads(ket_store.joinpath("cas", rec.inputs.split_manifest_cid).read_bytes())
+    assert splits.certificate_mismatch(cert, splits.assign_v1(rows)) is None
+    assert "exact_text_hit_rate" in metrics
+    assert rec.inputs.code_git == h.ledger.git_head() and rec.inputs.code_git_dirty is None
+
+
+def test_main_refuses_a_missing_cache_report(tmp_path, monkeypatch, ket_store):
+    h = _Harness(tmp_path, monkeypatch, fixture_rows(), pins={"s2-fixture": {"split_rule": splits.RULE_V1}})
+    with pytest.raises(CorpusError, match="cache-report.json is missing"):
+        h.run()
+    assert h.loaded == []
+
+
+def test_main_binds_by_the_recorded_certificate_and_rejects_a_rebuilt_cache(tmp_path, monkeypatch, ket_store):
+    from lemma.data import split_binding
+    rows = fixture_rows()
+    cid = split_binding.put_certificate(splits.certificate(splits.assign(rows), splits.RULE_V2))
+    h = _Harness(tmp_path, monkeypatch, rows, split_manifest_cid=cid)
+    _report(h.report, splits.assign(rows), {"train": 1, "val": 2, "test": 3})   # a cache rebuilt since
+    with pytest.raises(CorpusError, match="differ from the training cache"):
+        h.run()
+    _report(h.report, splits.assign(rows))
+    h.run()
+    rec, metrics = h.eval_record()
+    assert metrics["heldout"]["split_manifest_binding"] == "train_record_cid"
+    assert rec.inputs.split_manifest_cid == cid
+
+
+def test_main_refuses_a_dirty_tree_before_loading_anything(tmp_path, monkeypatch, ket_store, clean_repo):
+    from lemma import ledger
+    h = _Harness(tmp_path, monkeypatch, fixture_rows(), pins={"s2-fixture": {"split_rule": splits.RULE_V1}})
+    _report(h.report, splits.assign_v1(fixture_rows()))
+    (clean_repo / "src" / "evaluator.py").write_text("print('edited')\n")
+    with pytest.raises(ledger.DirtySourceError):
+        h.run()
+    assert h.loaded == []

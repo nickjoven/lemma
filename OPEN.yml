@@ -206,18 +206,34 @@
     number stands as full-corpus duplicate retrieval and its evidence is kept;
     the README is qualified. A renewed held-out claim needs a new sealed run
     of the corrected evaluator (github issue #5). Two limits on that rerun
-    for s2-mlm-20260909-141736: its train record has no split_manifest_cid
-    (train.py did not record one until #10), so the manifest is tied to the
-    checkpoint only by the cache report's per-split counts, and the eval
-    records split_manifest_binding = cache_report_counts_only; and its
-    manifest was built under the pre-#6 rule, which keeps locks inside a
-    split but can split a module, so its test split is held out by
-    declaration and lock, not by whole module (the eval records
+    for s2-mlm-20260909-141736. (1) Its train record has no
+    split_manifest_cid (train.py did not record one until #10), so nothing
+    the run sealed names its split. The evaluator rebuilds it under the
+    pre-#10 rule (splits.assign_v1), pinned in configs/split_pins.yml from
+    code history (the splits.py blob at the run's code_git; the cache build
+    commit is not recorded and that tree's cleanliness is unverified, L-10),
+    and refuses unless the rebuild reproduces the per-split counts in
+    corpora/cache/cache-report.json. Matching counts are necessary, not
+    sufficient: a different assignment with the same counts would pass. The
+    cache's split-manifest.json is not independent evidence (build_cache
+    writes it and the report in one invocation, and a rebuild overwrites
+    both), so it is read only when passed with --split-manifest, and then
+    must equal the rebuild row for row. The eval records
+    split_manifest_binding = pinned_rule_reconstructed. (2) That rule keeps
+    locks inside a split but can split a module, so the test split is held
+    out by declaration and lock, not by whole module (the eval records
     modules_shared_with_other_splits). A "held-out modules" claim needs a
-    checkpoint trained on a component-rule manifest (L-12).
-  fix: seal a new s2-eval run on the test split; report the margin over the
-    exact-text baseline as the learned part, and state the binding and the
-    module overlap with the number.
+    checkpoint trained on a component-rule split (L-12), whose train record
+    then carries a split certificate (binding = train_record_cid).
+  fix: >
+    seal a new s2-eval run on the test split; report the margin over the
+    exact-text baseline (now a ranked MRR, ties broken uniformly at random,
+    exact expectation) as the learned part, and state the binding and the
+    module overlap with the number. Owed by the owner, on the GPU box: if
+    corpora/cache was not rebuilt since the checkpoint trained, run the
+    eval with --split-manifest corpora/cache/split-manifest.json so the
+    file is checked row for row against the v1 rebuild, and record its
+    BLAKE3 in configs/split_pins.yml.
 - id: L-10
   severity: high
   status: fix-pending (start_run now refuses a source tree that differs from code_git, or seals the exact changed bytes under LEMMA_DIRTY_SOURCE=snapshot; scope is SOURCE_PATHS only)

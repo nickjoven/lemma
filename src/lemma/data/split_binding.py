@@ -56,7 +56,8 @@ class Binding:
                 "split_manifest_binding": self.binding, "split_pin_source": self.pin_source}
 
 
-def load_pins(path: Path = PINS_PATH) -> dict:
+def load_pins(path: Path | None = None) -> dict:
+    path = path or PINS_PATH
     if not path.exists():
         return {}
     return (yaml.safe_load(path.read_text()) or {}).get("runs", {}) or {}
@@ -68,9 +69,10 @@ def put_certificate(cert: dict) -> str:
 
 
 def resolve(run: ledger.RunRecord, rows, *, expect_rule: str | None = None,
-            pins_path: Path = PINS_PATH) -> Binding:
+            pins_path: Path | None = None) -> Binding:
     """The split `run` trained against, rebuilt over `rows` (the declarations
     corpus in iter_rows order) and checked as far as the record allows."""
+    pins_path = pins_path or PINS_PATH
     recorded = run.inputs.split_manifest_cid
     if recorded:
         try:
