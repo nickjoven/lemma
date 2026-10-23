@@ -1,4 +1,4 @@
-"""S4 v1 eval on module-held-out mutants, with the plan's controls.
+"""S4 v1 eval on held-out (trained-split) mutants, with the plan's controls.
 
   elaborates  macro-F1 (GATE >= 0.80) and accuracy on the test split
   baseline    bag-of-tokens logistic regression on the same split; the model
@@ -44,17 +44,18 @@ def main() -> int:
     ap.add_argument("--config", type=Path, default=REPO_ROOT / "configs" / "s4_verdict.yaml")
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
     cfg = yaml.safe_load(args.config.read_text())
     rng = random.Random(args.seed)
 
     train_rec = ledger.citable(args.run)
+    data, binding = mutants_by_split(cfg.get("ood_operator"), train_rec)   # the split this run trained against
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = VerdictModel(Encoder(EncoderConfig(vocab_size=tok.get_vocab_size(), max_seq=cfg["max_seq"])))
     model.load_state_dict(load_file(str(REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors")))
     model = model.to(device).eval()
 
-    data = mutants_by_split(cfg.get("ood_operator"))
     train, test = data["train"], data["test"]
     ood = cfg.get("ood_operator")
     test_iid = [t for t in test if t[3] != ood] if ood else test
@@ -81,6 +82,7 @@ def main() -> int:
     f1_perm = macro_f1(yp, pe)
 
     metrics = {
+        "split": binding.disclosure(),
         "test_mutants_iid": len(test_iid), "test_mutants_ood": len(test_ood), "ood_operator": ood,
         "elab_macro_f1": round(f1_elab, 4), "elab_accuracy": round(acc_elab, 4),
         "elab_macro_f1_bag_of_tokens": round(f1_base, 4), "elab_margin_pts": round(100 * (f1_elab - f1_base), 1),
@@ -101,9 +103,9 @@ def main() -> int:
         run_id=f"s4-eval-{args.run}", kind="eval", stage="S4", started=ledger.now_iso(),
         inputs=ledger.RunInputs(corpus_cids=train_rec.inputs.corpus_cids, tokenizer_cid=train_rec.inputs.tokenizer_cid,
                                 config_cid=train_rec.inputs.config_cid, init_checkpoint_cid=train_rec.checkpoint_cids[-1],
-                                code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
+                                split_manifest_cid=binding.certificate_cid, code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
-    ledger.start_run(rec)
+    ledger.start_run(rec, preflight=src_state)
     rec.calibration_record_cid = ledger.ket_put_json(calib)
     ledger.finish_run(rec, metrics, started_monotonic=t0,
                       status="completed" if calib["pass"] else "calibration_failed")

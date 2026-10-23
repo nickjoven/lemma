@@ -27,8 +27,8 @@ from safetensors.torch import save_file
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data import splits
-from .data.corpus import CORPORA, encoder_text, iter_rows
+from .data import split_binding, splits
+from .data.corpus import CORPORA, encoder_text
 from .models.encoder import Encoder
 from .models.heads import ProjectionHead
 from .objectives.contrastive import in_batch_accuracy, info_nce
@@ -51,16 +51,34 @@ class EquivModel(nn.Module):
 Pair = tuple[str, str, str, str]  # (a, b, module, kind: "iff" | "dedup")
 
 
-def equivalence_pairs_by_split() -> dict[str, list[Pair]]:
-    """Iff sides + same-lock dedup pairs, assigned to the module-level split.
-    A dedup pair whose two members fall in different splits is dropped (leak)."""
-    rows = list(iter_rows("declarations", verify=False))
-    assign = splits.assign(rows)
-    out: dict[str, list[Pair]] = {s: [] for s in splits.SPLITS}
+def iter_iff_pairs():
     with open(CORPORA / "iff_pairs.jsonl") as f:
         for line in f:
-            r = json.loads(line)
-            out[splits.split_of_area(r["module"])].append((r["lhs"], r["rhs"], r["module"], "iff"))
+            if line.strip():
+                yield json.loads(line)
+
+
+def equivalence_pairs_for(run) -> tuple[dict[str, list[Pair]], list, "split_binding.Binding"]:
+    """(pairs by split, declaration rows, Binding) under the split `run`
+    trained against (split_binding.resolve; for training, the S2 init run)."""
+    rows, binding = split_binding.resolve_corpus(run)
+    pairs = equivalence_pairs_by_split(rows, binding.assignment, iter_iff_pairs(), binding.rule_id)
+    return pairs, rows, binding
+
+
+def equivalence_pairs_by_split(rows, assign: dict[str, str], iff_pairs,
+                               rule: str = splits.CURRENT_RULE) -> dict[str, list[Pair]]:
+    """Iff sides + same-lock dedup pairs. An Iff pair takes its module's split
+    under `rule` (splits.module_split_fn: under the component rule, the split
+    of the module's declarations; an Iff pair of a module with no declaration
+    is excluded, never guessed). A dedup pair whose two members fall in
+    different splits is dropped (leak)."""
+    out: dict[str, list[Pair]] = {s: [] for s in splits.SPLITS}
+    split_of_module = splits.module_split_fn(rule, rows, assign)
+    for r in iff_pairs:
+        s = split_of_module(r["module"])
+        if s is not None:
+            out[s].append((r["lhs"], r["rhs"], r["module"], "iff"))
     by_lock: dict[str, list] = defaultdict(list)
     for r in rows:
         by_lock[r.lock].append(r)
@@ -104,6 +122,7 @@ def main() -> int:
     ap.add_argument("--config", type=Path, required=True)
     ap.add_argument("--run-id", default=None)
     args = ap.parse_args()
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
     cfg = yaml.safe_load(args.config.read_text())
     config_cid = ledger.ket_put(args.config.read_bytes())
     run_id = args.run_id or f"s5-equiv-{time.strftime('%Y%m%d-%H%M%S')}"
@@ -112,12 +131,12 @@ def main() -> int:
 
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     s2_rec = ledger.citable(cfg["s2_run"])
+    by_split, _, binding = equivalence_pairs_for(s2_rec)   # inherit the init checkpoint's split
     enc = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors",
                           tok.get_vocab_size(), cfg["max_seq"])
     model = EquivModel(enc, cfg.get("proj_dim", 256)).to(device)
     pad = enc.cfg.pad_id
 
-    by_split = equivalence_pairs_by_split()
     train = by_split["train"]
     prng = random.Random(cfg.get("seed", 1337))
     val = prng.sample(by_split["val"], min(cfg.get("val_pairs", 1500), len(by_split["val"])))
@@ -135,9 +154,10 @@ def main() -> int:
         run_id=run_id, kind="train", stage="S5", started=ledger.now_iso(),
         inputs=ledger.RunInputs(corpus_cids=s2_rec.inputs.corpus_cids, tokenizer_cid=s2_rec.inputs.tokenizer_cid,
                                 config_cid=config_cid, init_checkpoint_cid=s2_rec.checkpoint_cids[-1],
+                                split_manifest_cid=binding.certificate_cid,
                                 code_git=ledger.git_head(), mathlib_pin=s2_rec.inputs.mathlib_pin),
         seed=cfg.get("seed", 1337),
-        hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu", "torch": torch.__version__}))
+        hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu", "torch": torch.__version__}), preflight=src_state)
 
     t0 = time.monotonic()
     rng = np.random.default_rng(cfg.get("seed", 1337))
@@ -197,6 +217,7 @@ def main() -> int:
         "steps": steps, "train_pairs": len(train), "train_iff": n_iff,
         "val_iff_mrr_best": round(best_mrr, 4), "best_step": best_step,
         "hard_negatives": f"module-grouped batches, {per_module} per module",
+        "split": binding.disclosure(),
     }, started_monotonic=t0)
     print(f"run {run_id} sealed; metrics_cid {rec.metrics_cid}", flush=True)
     return 0
