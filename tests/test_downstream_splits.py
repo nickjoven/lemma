@@ -12,7 +12,7 @@ import pytest
 from lemma.data import corpus, split_binding, splits
 from lemma.schemas import MutantRow, RunInputs, RunRecord, TransitionRow
 
-from test_split_binding import decl, rule_change_rows
+from test_split_binding import rule_change_rows
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "lemma"
 
