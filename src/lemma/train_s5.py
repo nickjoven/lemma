@@ -131,12 +131,12 @@ def main() -> int:
 
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     s2_rec = ledger.citable(cfg["s2_run"])
+    by_split, _, binding = equivalence_pairs_for(s2_rec)   # inherit the init checkpoint's split
     enc = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors",
                           tok.get_vocab_size(), cfg["max_seq"])
     model = EquivModel(enc, cfg.get("proj_dim", 256)).to(device)
     pad = enc.cfg.pad_id
 
-    by_split, _, binding = equivalence_pairs_for(s2_rec)   # inherit the init checkpoint's split
     train = by_split["train"]
     prng = random.Random(cfg.get("seed", 1337))
     val = prng.sample(by_split["val"], min(cfg.get("val_pairs", 1500), len(by_split["val"])))

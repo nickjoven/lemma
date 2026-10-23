@@ -151,12 +151,12 @@ def main() -> int:
 
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     s2_rec = ledger.citable(cfg["s2_run"])
+    rows, binding = split_binding.resolve_corpus(s2_rec)   # inherit the init checkpoint's split
     s2_ckpt = REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors"
     enc = load_s2_encoder(s2_ckpt, tok.get_vocab_size(), cfg["max_seq"])
     model = GlossModel(enc, cfg.get("proj_dim", 256)).to(device)
     pad = enc.cfg.pad_id
 
-    rows, binding = split_binding.resolve_corpus(s2_rec)   # inherit the init checkpoint's split
     by_split = gloss_pairs_by_split(rows, binding.assignment)
     train = by_split["train"]
     prng = random.Random(cfg.get("seed", 1337))

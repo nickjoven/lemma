@@ -110,12 +110,12 @@ def main() -> int:
 
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     s2_rec = ledger.citable(cfg["s2_run"])
+    data, binding = mutants_by_split(cfg.get("ood_operator"), s2_rec)   # inherit the init checkpoint's split
     enc = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors",
                           tok.get_vocab_size(), cfg["max_seq"])
     model = VerdictModel(enc).to(device)
     pad = enc.cfg.pad_id
 
-    data, binding = mutants_by_split(cfg.get("ood_operator"), s2_rec)   # inherit the init checkpoint's split
     train, val = data["train"], data["val"]
     n_pos = sum(t[1] for t in train)
     w = torch.tensor([len(train) / max(len(train) - n_pos, 1), len(train) / max(n_pos, 1)], device=device)

@@ -49,13 +49,13 @@ def main() -> int:
     rng = random.Random(args.seed)
 
     train_rec = ledger.citable(args.run)
+    data, binding = mutants_by_split(cfg.get("ood_operator"), train_rec)   # the split this run trained against
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = VerdictModel(Encoder(EncoderConfig(vocab_size=tok.get_vocab_size(), max_seq=cfg["max_seq"])))
     model.load_state_dict(load_file(str(REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors")))
     model = model.to(device).eval()
 
-    data, binding = mutants_by_split(cfg.get("ood_operator"), train_rec)   # the split this run trained against
     train, test = data["train"], data["test"]
     ood = cfg.get("ood_operator")
     test_iid = [t for t in test if t[3] != ood] if ood else test

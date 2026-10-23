@@ -52,9 +52,9 @@ def main() -> int:
     rng = random.Random(args.seed)
 
     train_rec = ledger.citable(args.run)
+    data, classes, audit, binding = load_labelled(cfg, train_rec)   # the split this run trained against
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    data, classes, audit, binding = load_labelled(cfg, train_rec)   # the split this run trained against
     model = VerdictModelV2(Encoder(EncoderConfig(vocab_size=tok.get_vocab_size(), max_seq=cfg["max_seq"])), len(classes))
     model.load_state_dict(load_file(str(REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors")))
     model = model.to(device).eval()

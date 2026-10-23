@@ -61,13 +61,13 @@ def main() -> int:
     max_seq = 256
 
     train_rec = ledger.citable(args.run)
+    by_split, rows, binding = equivalence_pairs_for(train_rec)   # the split this run trained against (review of #10)
     tok = Tokenizer.from_file(str(REPO_ROOT / "runs" / "tokenizer" / "lean-unigram-32k.json"))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = EquivModel(Encoder(EncoderConfig(vocab_size=tok.get_vocab_size(), max_seq=max_seq)), 256)
     model.load_state_dict(load_file(str(REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors")))
     model = model.to(device).eval()
 
-    by_split, rows, binding = equivalence_pairs_for(train_rec)   # the split this run trained against (review of #10)
     test = by_split["test"]
     iff = [p for p in test if p[3] == "iff"]
     dedup = [p for p in test if p[3] == "dedup"]

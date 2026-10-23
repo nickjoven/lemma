@@ -132,14 +132,14 @@ def main() -> int:
     t0 = time.monotonic()
 
     s2_rec = ledger.citable(args.s2_run)
+    # the split the S2 encoder trained against, as the W0 model on top of it will (review of #10)
+    _, binding = split_binding.resolve_corpus(s2_rec)
     tok = Tokenizer.from_file(args.tokenizer)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     enc = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{args.s2_run}.safetensors", tok.get_vocab_size(), args.max_seq).to(device).eval()
 
     goals = {g.lock: g.readable for g in iter_goals()}
     rows = list(iter_transitions())
-    # the split the S2 encoder trained against, as the W0 model on top of it will (review of #10)
-    _, binding = split_binding.resolve_corpus(s2_rec)
     split_of = splits.assign_transitions(rows, binding.assignment)
     steps = [(i, t) for i, t in enumerate(single_step_rows(rows)) if t.goal_before in goals and t.goal_after[0] in goals]
     # re-index split by original row identity

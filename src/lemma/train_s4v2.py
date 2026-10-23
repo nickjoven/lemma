@@ -109,10 +109,10 @@ def main() -> int:
 
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     s2_rec = ledger.citable(cfg["s2_run"])
+    data, classes, audit, binding = load_labelled(cfg, s2_rec)   # inherit the init checkpoint's split
     enc = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors",
                           tok.get_vocab_size(), cfg["max_seq"])
 
-    data, classes, audit, binding = load_labelled(cfg, s2_rec)   # inherit the init checkpoint's split
     train, val = data["train"], data["val"]
     if not train or not val:
         raise SystemExit(f"S4 v2: empty split ({audit['per_split']}); nothing to train on")

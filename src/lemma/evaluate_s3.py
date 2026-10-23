@@ -58,6 +58,7 @@ def main() -> int:
     rng = random.Random(args.seed)
 
     train_rec = ledger.citable(args.run)
+    test, binding = gloss_pairs("test", train_rec)   # the split this run trained against (review of #10)
     cfg_max_seq = 256
     tok = Tokenizer.from_file(str(REPO_ROOT / "runs" / "tokenizer" / "lean-unigram-32k.json"))
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -66,7 +67,6 @@ def main() -> int:
     model.load_state_dict(load_file(str(REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors")))
     model = model.to(device).eval()
 
-    test, binding = gloss_pairs("test", train_rec)   # the split this run trained against (review of #10)
     glosses = [t[0] for t in test]
     stmts = [t[1] for t in test]
     mods = [t[2] for t in test]

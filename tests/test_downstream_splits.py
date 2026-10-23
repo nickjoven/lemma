@@ -193,3 +193,28 @@ def test_s5_iff_pairs_land_with_their_modules_declarations():
     # a v1 run is reproduced as it trained (module hash), not silently re-split
     v1 = equivalence_pairs_by_split(rows, splits.assign_v1(rows), iff[:1], splits.RULE_V1)
     assert [p[3] for p in v1["train"] if p[3] == "iff"] == ["iff"]
+
+
+def _called(node) -> set[str]:
+    return {getattr(c.func, "attr", getattr(c.func, "id", None)) for c in ast.walk(node) if isinstance(c, ast.Call)}
+
+
+def test_every_entrypoint_resolves_its_split_before_loading_weights():
+    """Second review of #10, finding 7: an unpinned or mismatched run must be
+    refused before any checkpoint is read. The split resolvers are found, not
+    listed: resolve_corpus and every function that calls it. Trainers too:
+    a trainer must refuse an unbindable init run before reading its weights."""
+    fns = [fn for p in SRC.rglob("*.py") for fn in ast.walk(ast.parse(p.read_text()))
+           if isinstance(fn, ast.FunctionDef)]
+    # resolve_corpus and the helpers that call it directly (gloss_pairs, mutants_by_split, ...)
+    resolvers = {"resolve_corpus"} | {fn.name for fn in fns if "resolve_corpus" in _called(fn)}
+    loads = {"load_file", "load_state_dict", "load_s2_encoder", "load_encoder"}
+    checked = 0
+    for fn in fns:
+        calls = [c for c in ast.walk(fn) if isinstance(c, ast.Call)]
+        res = [c.lineno for c in calls if getattr(c.func, "attr", getattr(c.func, "id", None)) in resolvers]
+        lds = [c.lineno for c in calls if getattr(c.func, "attr", getattr(c.func, "id", None)) in loads]
+        if res and lds:
+            checked += 1
+            assert min(res) < min(lds), f"{fn.name}: loads weights (line {min(lds)}) before resolving its split"
+    assert checked >= 10, f"only {checked} entrypoints found; the discovery is broken"

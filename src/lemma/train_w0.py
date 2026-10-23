@@ -155,8 +155,8 @@ def train(args) -> int:
     torch.manual_seed(cfg.get("seed", 1337))
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     s2_rec = ledger.citable(cfg["s2_run"])
-    enc = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors", tok.get_vocab_size(), cfg["max_seq"])
     data, tactics, binding = load_data(cfg, s2_rec)   # inherit the init checkpoint's split
+    enc = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors", tok.get_vocab_size(), cfg["max_seq"])
     train_rows, val_rows = data["train"], data["val"]
     train_single = [r for r in train_rows if r["single"]]
     val_single = [r for r in val_rows if r["single"]]
@@ -264,6 +264,7 @@ def evaluate(args) -> int:
     cfg = yaml.safe_load(args.config.read_text())
     rng = random.Random(args.seed)
     train_rec = ledger.citable(args.run)
+    data, _, binding = load_data(cfg, train_rec)   # the split this W0 run trained against
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tactics = json.loads((REPO_ROOT / "runs" / f"{args.run}-tactics.json").read_text())
@@ -275,7 +276,6 @@ def evaluate(args) -> int:
     target = target.to(device).eval()
     s2 = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{cfg['s2_run']}.safetensors", tok.get_vocab_size(), cfg["max_seq"]).to(device).eval()
 
-    data, _, binding = load_data(cfg, train_rec)   # the split this W0 run trained against
     test = data["test"]
     single = [r for r in test if r["single"]]
     if len(single) > args.max_candidates:
