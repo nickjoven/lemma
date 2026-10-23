@@ -315,7 +315,11 @@
     split and the training split: no split the run sealed confirms it. And
     build_cache refuses a RULE_V2 split whose largest
     component holds more than 10% of the rows unless --override-l12, which
-    the manifest records. The 10% is a guard so the rule cannot be used
+    the manifest records (l12_override); train.record_cache_split re-checks
+    the guard on the manifest's disclosed component statistics, refuses an
+    over-guard v2 manifest without the override, and copies the override
+    into the split certificate, so the train record's split_manifest_cid
+    carries it. The 10% is a guard so the rule cannot be used
     silently, not a choice among the options above. Until the owner
     decides, a new S2 run either waits or is built with an explicit
     --override-l12 or --rule v1, and says which.

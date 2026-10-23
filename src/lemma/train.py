@@ -39,7 +39,10 @@ def collate(batch: list[np.ndarray], pad_id: int, max_seq: int) -> torch.Tensor:
 def record_cache_split(cache_dir: Path) -> str:
     """Seal the certificate of the split the cache in `cache_dir` was built
     from; refuses a cache without its manifest, a manifest without a known
-    rule id, or one whose counts are not the cache report's."""
+    rule id, or one whose counts are not the cache report's. A component-rule
+    (v2) manifest must also pass the L-12 guard on the component statistics
+    it discloses, or carry build_cache's l12_override, which then goes into
+    the certificate (and so into the train record's split_manifest_cid)."""
     import json
 
     from .data import split_binding, splits
@@ -52,6 +55,16 @@ def record_cache_split(cache_dir: Path) -> str:
     if "rule_id" not in manifest:
         raise SystemExit(f"{split_manifest} names no rule_id (built before #10); rebuild the cache")
     cert = splits.certificate(manifest["assignment"], manifest["rule_id"])
+    if cert["rule_id"] == splits.RULE_V2:
+        largest = (manifest.get("components") or {}).get("largest_component_rows")
+        if largest is None:
+            raise SystemExit(f"{split_manifest} discloses no component statistics; the L-12 guard cannot be checked")
+        frac = largest / max(len(manifest["assignment"]), 1)
+        if frac > splits.GIANT_COMPONENT_MAX_FRACTION and manifest.get("l12_override") is not True:
+            raise SystemExit(f"{split_manifest}: the largest component holds {frac:.1%} of the rows, over the "
+                             f"L-12 guard, and the manifest records no l12_override (OPEN.yml L-12)")
+        if manifest.get("l12_override") is True:
+            cert["l12_override"] = True
     want = {s: v["sequences"] for s, v in json.loads(report.read_text())["splits"].items()}
     if {s: cert["counts"].get(s, 0) for s in want} != want:
         raise SystemExit(f"split manifest counts {cert['counts']} differ from the cache report {want}")

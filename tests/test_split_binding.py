@@ -235,9 +235,20 @@ def _cache(tmp_path, rows, rule=splits.RULE_V2, counts=None, rule_id=True):
     return cache
 
 
+def guarded_rows():
+    """rule_change_rows plus solos, so its one multi-module component is under the L-12 guard"""
+    return rule_change_rows() + [decl(f"g{i}", f"Mathlib.G{i}", f"g{i}") for i in range(20)]
+
+
+def hub_rows():
+    """one five-module component in 25 rows: 20%, over the L-12 guard"""
+    rows = [decl(f"h{i}", f"Mathlib.Hub{i}", "hub", ) for i in range(5)]
+    return rows + [decl(f"s{i}", f"Mathlib.Solo{i}", f"s{i}") for i in range(20)]
+
+
 def test_train_records_a_certificate_that_resolves(tmp_path, ket_store):
     from lemma.train import record_cache_split
-    rows = rule_change_rows()
+    rows = guarded_rows()
     cid = record_cache_split(_cache(tmp_path, rows))
     b = split_binding.resolve(run(split_manifest_cid=cid), corpus=IDENT, rows=rows)
     assert b.assignment == splits.assign(rows)
@@ -246,7 +257,7 @@ def test_train_records_a_certificate_that_resolves(tmp_path, ket_store):
 
 def test_train_refuses_a_cache_it_cannot_bind(tmp_path, ket_store):
     from lemma.train import record_cache_split
-    rows = rule_change_rows()
+    rows = guarded_rows()
     with pytest.raises(SystemExit, match="no rule_id"):
         record_cache_split(_cache(tmp_path / "a", rows, rule_id=False))
     with pytest.raises(SystemExit, match="differ from the cache report"):
@@ -332,3 +343,53 @@ def test_a_shard_that_does_not_verify_is_refused(tmp_path, monkeypatch, ket_stor
     shard.write_text("".join(r.model_dump_json() + "\n" for r in rows[::-1]))   # edited under its old CID
     with pytest.raises(CorpusError, match="content hash"):
         split_binding.resolve_corpus(run())
+
+
+# review of #10, second round, finding 6: the L-12 override is recorded where a
+# training run's record can see it, and record_cache_split enforces the guard.
+
+def test_train_refuses_a_v2_cache_over_the_l12_guard_unless_overridden(tmp_path, ket_store):
+    from lemma.train import record_cache_split
+    rows = hub_rows()
+    with pytest.raises(SystemExit, match="L-12"):
+        record_cache_split(_cache(tmp_path / "a", rows))
+    cache = _cache(tmp_path / "b", rows)
+    man = json.loads((cache / "split-manifest.json").read_text())
+    (cache / "split-manifest.json").write_text(json.dumps({**man, "l12_override": True}))
+    cid = record_cache_split(cache)
+    assert json.loads(ledger.ket_get_verified(cid))["l12_override"] is True
+    assert split_binding.resolve(run(split_manifest_cid=cid), corpus=IDENT, rows=rows).binding == "train_record_cid"
+    # v1 has no component guard
+    cid = record_cache_split(_cache(tmp_path / "c", rows, rule=splits.RULE_V1))
+    assert "l12_override" not in json.loads(ledger.ket_get_verified(cid))
+
+
+def test_build_cache_main_refuses_l12_and_records_the_override(tmp_path, monkeypatch, ket_store):
+    import sys
+
+    from tokenizers import Tokenizer, models, pre_tokenizers
+
+    from lemma.data import build_cache
+    from lemma.train import record_cache_split
+    rows = hub_rows()
+    write_corpus(tmp_path / "corpora", monkeypatch, [rows])
+    vocab = {"<unk>": 0, **{f"T[{r.name}]": i + 1 for i, r in enumerate(rows)}}
+    tok = Tokenizer(models.WordLevel(vocab, unk_token="<unk>"))
+    tok.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
+    tok.save(str(tmp_path / "tok.json"))
+
+    def main(out, *extra):
+        monkeypatch.setattr(sys, "argv", ["build_cache", "--tokenizer", str(tmp_path / "tok.json"),
+                                          "--out", str(out), *extra])
+        return build_cache.main()
+
+    with pytest.raises(SystemExit, match="L-12"):
+        main(tmp_path / "refused")
+    assert not (tmp_path / "refused" / "split-manifest.json").exists()
+    with pytest.raises(SystemExit, match="v2"):
+        main(tmp_path / "v1", "--rule", splits.RULE_V1, "--override-l12")
+    assert main(tmp_path / "over", "--override-l12") == 0
+    man = json.loads((tmp_path / "over" / "split-manifest.json").read_text())
+    assert man["l12_override"] is True and man["rule_id"] == splits.RULE_V2
+    cert = json.loads(ledger.ket_get_verified(record_cache_split(tmp_path / "over")))
+    assert cert["l12_override"] is True
