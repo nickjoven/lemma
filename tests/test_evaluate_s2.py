@@ -305,3 +305,23 @@ def test_main_refuses_a_dirty_tree_before_loading_anything(tmp_path, monkeypatch
     with pytest.raises(ledger.DirtySourceError):
         h.run()
     assert h.loaded == []
+
+
+def test_cross_module_duplicate_group_is_held_out_whole():
+    """Review of #10 test gap: a duplicate group whose members live in two
+    modules (one component under the current rule). The group and both
+    modules must be in one split, the group must be queryable there, and
+    under the old rule the same corpus splits a module, which the pool
+    disclosure must report."""
+    from test_split_binding import rule_change_rows
+    rows = rule_change_rows()
+    assign = splits.assign(rows)
+    group = [r for r in rows if r.lock == "L"]
+    assert len({r.module for r in group}) == 2 and {assign[r.name] for r in group} == {"test"}
+    members, _, stats = heldout_pool(rows, assign, 1000, 1000, random.Random(0))
+    assert {r.name for r in group} <= {r.name for r in members}
+    assert stats["modules_shared_with_other_splits"] == 0
+    # v1 keeps lock L in one split (train) but leaves module A's other rows in test
+    v1 = splits.assign_v1(rows)
+    _, _, legacy = heldout_pool(rows, v1, 1000, 1000, random.Random(0))
+    assert legacy["modules_shared_with_other_splits"] >= 1

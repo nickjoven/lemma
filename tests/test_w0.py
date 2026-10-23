@@ -64,3 +64,69 @@ def test_best_pair_saves_online_and_target_from_the_same_step(tmp_path):
         assert torch.equal(saved_target[k], v), k
     # and NOT the final (perturbed) target, which is what the old code released
     assert any(not torch.equal(saved_target[k], v) for k, v in target.state_dict().items())
+
+
+def test_train_releases_the_best_pair_with_role_labelled_cids(tmp_path, monkeypatch, ket_store):
+    """Review of #10 test gap: drive train_w0.train() end to end on CPU and
+    check the end-of-training moves (best files become the released files),
+    the CID roles ([0] online, [1] EMA target), the sealed manifest, the
+    .gitignore lines, and that the run records the split it inherited."""
+    import argparse
+    import json
+
+    import blake3
+    import yaml
+    from tokenizers import Tokenizer, models, pre_tokenizers
+
+    from lemma import ledger, train_w0
+    from lemma.data.split_binding import Binding
+    from lemma.schemas import RunInputs, RunRecord
+
+    words = [f"w{i}" for i in range(40)]
+    vocab = {"<pad>": 0, "<unk>": 1, **{w: i + 2 for i, w in enumerate(words)}}
+    tok = Tokenizer(models.WordLevel(vocab, unk_token="<unk>"))
+    tok.pre_tokenizer = pre_tokenizers.WhitespaceSplit()
+    monkeypatch.setattr(train_w0.Tokenizer, "from_file", staticmethod(lambda _p: tok))
+    monkeypatch.setattr(train_w0, "load_s2_encoder",
+                        lambda ckpt, vocab_size, max_seq: Encoder(EncoderConfig(vocab_size=vocab_size, max_seq=max_seq,
+                                                                                d_model=16, n_layers=1, n_heads=2, d_ff=32)))
+
+    def row(i):
+        return {"before": f"w{i % 40} w{(i * 7) % 40}", "after": f"w{(i + 3) % 40} w{(i * 5) % 40}", "single": True,
+                "tactic": ["simp", "aesop"][i % 2], "outcome": i % 4, "logcost": 2.0, "censored": i % 9 == 0,
+                "before_lock": f"b{i}", "after_lock": f"a{i}"}
+    data = {"train": [row(i) for i in range(120)], "val": [row(i) for i in range(200, 225)], "test": []}
+    binding = Binding({}, "v1-module-lock-follows-first", ledger.ket_put(b"fixture certificate"), "pinned_rule_reconstructed")
+    monkeypatch.setattr(train_w0, "load_data", lambda cfg, run: (data, ["aesop", "simp"], binding))
+
+    s2 = RunRecord(run_id="s2-fixture", kind="train", stage="S2", started=ledger.now_iso(),
+                   inputs=RunInputs(corpus_cids=["corpus"], config_cid="cfg", code_git=ledger.git_head(), mathlib_pin="pin"))
+    s2.checkpoint_cids.append(ledger.ket_put(b"s2 weights"))
+    ledger.finish_run(s2, {"masked_acc": 0.9})
+
+    root = tmp_path / "w0root"
+    root.mkdir()
+    (root / ".gitignore").write_text("")
+    monkeypatch.setattr(train_w0, "REPO_ROOT", root)
+    cfg = {"s2_run": "s2-fixture", "tokenizer_path": "unused", "max_seq": 8, "seed": 0, "batch_size": 8,
+           "steps": 6, "val_every": 2, "lr_encoder": 1e-3, "lr_heads": 1e-2, "ema": 0.5}
+    (tmp_path / "w0.yaml").write_text(yaml.safe_dump(cfg))
+    assert train_w0.train(argparse.Namespace(config=tmp_path / "w0.yaml", run_id="w0-fixture")) == 0
+
+    ckpts = root / "runs" / "ckpts"
+    online, target = ckpts / "w0-fixture.safetensors", ckpts / "w0-fixture-target.safetensors"
+    assert online.exists() and target.exists()
+    assert not (ckpts / "w0-fixture-best.safetensors").exists()
+    assert not (ckpts / "w0-fixture-best-target.safetensors").exists()
+    rec = ledger.citable("w0-fixture")
+    assert rec.checkpoint_cids == [blake3.blake3(online.read_bytes()).hexdigest(),
+                                   blake3.blake3(target.read_bytes()).hexdigest()]
+    assert rec.inputs.split_manifest_cid == binding.certificate_cid
+    metrics = json.loads(ledger.ket_get(rec.metrics_cid))["metrics"]
+    assert metrics["checkpoint_roles"] == {"online": rec.checkpoint_cids[0], "ema_target": rec.checkpoint_cids[1]}
+    manifest = json.loads(ledger.ket_get_verified(metrics["checkpoint_manifest_cid"]))
+    assert [c["role"] for c in manifest["checkpoints"]] == ["online", "ema_target"]
+    assert manifest["best_step"] == metrics["best_step"] and manifest["steps"] == 6
+    assert json.loads(ledger.ket_get_verified(manifest["tactics_cid"])) == ["aesop", "simp"]
+    ignored = (root / ".gitignore").read_text().splitlines()
+    assert all(f".ket/cas/{c}" in ignored for c in rec.checkpoint_cids)
