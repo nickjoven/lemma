@@ -9,9 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from lemma.data import corpus, split_binding, splits
+from lemma.data import split_binding, splits
 from lemma.schemas import MutantRow, RunInputs, RunRecord, TransitionRow
 
+from corpus_fixture import SOURCE, write_corpus
 from test_split_binding import rule_change_rows
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "lemma"
@@ -19,7 +20,7 @@ SRC = Path(__file__).resolve().parents[1] / "src" / "lemma"
 
 def legacy(run_id="legacy-run"):
     return RunRecord(run_id=run_id, kind="train", stage="S3", started="t",
-                     inputs=RunInputs(corpus_cids=[], config_cid="c", code_git="g", mathlib_pin="p"))
+                     inputs=RunInputs(corpus_cids=[SOURCE], config_cid="c", code_git="g", mathlib_pin="p"))
 
 
 @pytest.fixture
@@ -27,9 +28,10 @@ def corpus_rows(monkeypatch, tmp_path, ket_store):
     rows = rule_change_rows()
     for r in rows:
         r.docstring = f"doc of {r.name}"
-    monkeypatch.setattr(corpus, "iter_rows", lambda *a, **k: iter(rows))
+    ident = write_corpus(tmp_path / "corpora", monkeypatch, [rows[:3], rows[3:]])
     pins = tmp_path / "pins.yml"
-    pins.write_text(json.dumps({"runs": {"legacy-run": {"split_rule": splits.RULE_V1}}}))
+    pins.write_text(json.dumps({"runs": {"legacy-run": {"split_rule": splits.RULE_V1,
+                                                        "declarations_shards_blake3": ident["shards_blake3"]}}}))
     monkeypatch.setattr(split_binding, "PINS_PATH", pins)
     return rows
 

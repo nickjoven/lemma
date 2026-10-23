@@ -13,7 +13,12 @@ from lemma import ledger
 from lemma.data import split_binding, splits
 from lemma.schemas import DeclarationRow, RunInputs, RunRecord
 
+from corpus_fixture import SOURCE, write_corpus
+
 REAL_REPO = Path(__file__).resolve().parents[1]
+# the identity of an in-memory corpus, for tests that hand resolve() rows directly
+IDENT = {"corpus": "declarations", "source_manifest_cid": SOURCE, "shards": 1, "shards_blake3": "fixture-shards"}
+V1_PIN = {"split_rule": splits.RULE_V1, "declarations_shards_blake3": "fixture-shards"}
 
 
 def decl(name, module, lock):
@@ -38,7 +43,7 @@ def rule_change_rows():
 
 def run(run_id="s2-legacy", split_manifest_cid=None):
     return RunRecord(run_id=run_id, kind="train", stage="S2", started="t",
-                     inputs=RunInputs(corpus_cids=[], config_cid="c", code_git="g", mathlib_pin="p",
+                     inputs=RunInputs(corpus_cids=[SOURCE], config_cid="c", code_git="g", mathlib_pin="p",
                                       split_manifest_cid=split_manifest_cid))
 
 
@@ -73,12 +78,12 @@ def test_assign_v1_is_the_pre_10_assign_byte_for_byte():
 
 def test_unpinned_run_without_a_recorded_split_is_refused(tmp_path, ket_store):
     with pytest.raises(split_binding.SplitBindingError, match="no split-rule pin"):
-        split_binding.resolve(run(), rule_change_rows(), pins_path=pins(tmp_path, {}))
+        split_binding.resolve(run(), corpus=IDENT, rows=rule_change_rows(), pins_path=pins(tmp_path, {}))
 
 
 def test_pinned_legacy_run_gets_its_old_split_not_todays(tmp_path, ket_store):
     rows = rule_change_rows()
-    b = split_binding.resolve(run(), rows, pins_path=pins(tmp_path, {"s2-legacy": {"split_rule": splits.RULE_V1}}))
+    b = split_binding.resolve(run(), corpus=IDENT, rows=rows, pins_path=pins(tmp_path, {"s2-legacy": V1_PIN}))
     assert b.assignment == splits.assign_v1(rows) != splits.assign(rows)
     assert b.assignment["a_dup"] == "train"           # trained on: never in its test split
     assert b.binding == "pinned_rule_reconstructed" and b.rule_id == splits.RULE_V1
@@ -87,23 +92,27 @@ def test_pinned_legacy_run_gets_its_old_split_not_todays(tmp_path, ket_store):
 
 
 def test_explicit_rule_must_agree_with_the_pin(tmp_path, ket_store):
-    path = pins(tmp_path, {"s2-legacy": {"split_rule": splits.RULE_V1}})
+    path = pins(tmp_path, {"s2-legacy": V1_PIN})
     with pytest.raises(split_binding.SplitBindingError, match="contradicts the pin"):
-        split_binding.resolve(run(), rule_change_rows(), expect_rule=splits.RULE_V2, pins_path=path)
-    b = split_binding.resolve(run(), rule_change_rows(), expect_rule=splits.RULE_V1, pins_path=pins(tmp_path, {}))
+        split_binding.resolve(run(), corpus=IDENT, rows=rule_change_rows(), expect_rule=splits.RULE_V2, pins_path=path)
+    b = split_binding.resolve(run(), corpus=IDENT, rows=rule_change_rows(), expect_rule=splits.RULE_V2, pins_path=pins(tmp_path, {}))
     assert b.pin_source == "explicit"
+    # v1 depends on row order, which an explicit rule cannot pin
+    with pytest.raises(split_binding.SplitBindingError, match="depends on row order"):
+        split_binding.resolve(run(), corpus=IDENT, rows=rule_change_rows(), expect_rule=splits.RULE_V1,
+                              pins_path=pins(tmp_path, {}))
 
 
 def test_recorded_certificate_is_verified_against_the_rebuild(tmp_path, ket_store):
     rows = rule_change_rows()
     cid = split_binding.put_certificate(splits.certificate(splits.assign(rows), splits.RULE_V2))
-    b = split_binding.resolve(run(split_manifest_cid=cid), rows, pins_path=pins(tmp_path, {}))
+    b = split_binding.resolve(run(split_manifest_cid=cid), corpus=IDENT, rows=rows, pins_path=pins(tmp_path, {}))
     assert b.binding == "train_record_cid" and b.assignment == splits.assign(rows)
     with pytest.raises(split_binding.SplitBindingError, match="trained under"):
-        split_binding.resolve(run(split_manifest_cid=cid), rows, expect_rule=splits.RULE_V1)
+        split_binding.resolve(run(split_manifest_cid=cid), corpus=IDENT, rows=rows, expect_rule=splits.RULE_V1)
     # a corpus that changed since training cannot reproduce the recorded split
     with pytest.raises(split_binding.SplitBindingError, match="not the one it trained against"):
-        split_binding.resolve(run(split_manifest_cid=cid), rows + [decl("new", "Mathlib.New", "n")])
+        split_binding.resolve(run(split_manifest_cid=cid), corpus=IDENT, rows=rows + [decl("new", "Mathlib.New", "n")])
 
 
 def test_certificate_claiming_the_wrong_rule_is_refused(ket_store):
@@ -111,14 +120,14 @@ def test_certificate_claiming_the_wrong_rule_is_refused(ket_store):
     forged = splits.certificate(splits.assign_v1(rows), splits.RULE_V2)   # v1 split labelled v2
     cid = split_binding.put_certificate(forged)
     with pytest.raises(split_binding.SplitBindingError, match="not the one it trained against"):
-        split_binding.resolve(run(split_manifest_cid=cid), rows)
+        split_binding.resolve(run(split_manifest_cid=cid), corpus=IDENT, rows=rows)
 
 
 def test_a_full_manifest_is_not_a_certificate(ket_store):
     rows = rule_change_rows()
     cid = ledger.ket_put_json(splits.manifest(rows))
     with pytest.raises(split_binding.SplitBindingError, match="not a lemma-split-cert"):
-        split_binding.resolve(run(split_manifest_cid=cid), rows)
+        split_binding.resolve(run(split_manifest_cid=cid), corpus=IDENT, rows=rows)
 
 
 def test_certificate_is_small_and_order_free():
@@ -167,7 +176,7 @@ def test_train_records_a_certificate_that_resolves(tmp_path, ket_store):
     from lemma.train import record_cache_split
     rows = rule_change_rows()
     cid = record_cache_split(_cache(tmp_path, rows))
-    b = split_binding.resolve(run(split_manifest_cid=cid), rows)
+    b = split_binding.resolve(run(split_manifest_cid=cid), corpus=IDENT, rows=rows)
     assert b.assignment == splits.assign(rows)
     assert len(ledger.ket_get(cid)) < 600     # what goes into the git-tracked store
 
@@ -184,3 +193,79 @@ def test_train_refuses_a_cache_it_cannot_bind(tmp_path, ket_store):
     (bare / "split-manifest.json").write_text("{}")
     with pytest.raises(SystemExit, match="cache-report.json is missing"):
         record_cache_split(bare)
+
+
+# review of #10, second round, finding 1: v1 depends on row order, so a pinned
+# v1 rebuild is only the trained split over the recorded corpus in the order
+# the build read it. These go through resolve_corpus, as every entrypoint does.
+
+def swap_rows():
+    """Two shards whose order flips which side of two shared locks is seen
+    first, so v1 moves four rows and the per-split counts stay identical."""
+    mods = [f"Mathlib.Z{i}" for i in range(400)]
+    tr = next(m for m in mods if splits.split_of_area(m) == "train")
+    te = next(m for m in mods if splits.split_of_area(m) == "test")
+    first = [decl("t1", tr, "L1"), decl("s2", te, "L2")]
+    second = [decl("s1", te, "L1"), decl("t2", tr, "L2")]
+    pad = [decl(f"p{i}", f"Mathlib.P{i}", f"p{i}") for i in range(20)]
+    return first + pad, second
+
+
+def counts(a):
+    return {s: sum(v == s for v in a.values()) for s in splits.SPLITS}
+
+
+def test_pinned_v1_over_the_recorded_corpus_resolves(tmp_path, monkeypatch, ket_store):
+    rows = rule_change_rows()
+    ident = write_corpus(tmp_path / "corpora", monkeypatch, [rows[:3], rows[3:]])
+    pin = {"split_rule": splits.RULE_V1, "declarations_shards_blake3": ident["shards_blake3"]}
+    monkeypatch.setattr(split_binding, "PINS_PATH", pins(tmp_path, {"s2-legacy": pin}))
+    got, b = split_binding.resolve_corpus(run())
+    assert [r.name for r in got] == [r.name for r in rows]
+    assert b.assignment == splits.assign_v1(rows) and b.binding == "pinned_rule_reconstructed"
+
+
+def test_reversed_row_order_under_a_pinned_v1_run_is_refused(tmp_path, monkeypatch, ket_store):
+    rows = rule_change_rows()
+    assert splits.assign_v1(rows[::-1]) != splits.assign_v1(rows), "fixture: reversing must change the v1 split"
+    ident = write_corpus(tmp_path / "a", monkeypatch, [rows])
+    pin = {"split_rule": splits.RULE_V1, "declarations_shards_blake3": ident["shards_blake3"]}
+    monkeypatch.setattr(split_binding, "PINS_PATH", pins(tmp_path, {"s2-legacy": pin}))
+    write_corpus(tmp_path / "b", monkeypatch, [rows[::-1]])     # same rows, same source CID, reversed
+    with pytest.raises(split_binding.SplitBindingError, match="shard order"):
+        split_binding.resolve_corpus(run())
+
+
+def test_swapped_lock_order_corpus_with_identical_counts_is_refused(tmp_path, monkeypatch, ket_store):
+    first, second = swap_rows()
+    a, b = splits.assign_v1(first + second), splits.assign_v1(second + first)
+    assert a != b and counts(a) == counts(b), "fixture: a cache report's counts cannot tell these apart"
+    ident = write_corpus(tmp_path / "a", monkeypatch, [first, second])
+    pin = {"split_rule": splits.RULE_V1, "declarations_shards_blake3": ident["shards_blake3"]}
+    monkeypatch.setattr(split_binding, "PINS_PATH", pins(tmp_path, {"s2-legacy": pin}))
+    assert split_binding.resolve_corpus(run())[1].assignment == a
+    write_corpus(tmp_path / "b", monkeypatch, [first, second], order=[1, 0])   # every shard still verifies
+    with pytest.raises(split_binding.SplitBindingError, match="shard order"):
+        split_binding.resolve_corpus(run())
+
+
+def test_a_corpus_other_than_the_recorded_one_is_refused(tmp_path, monkeypatch, ket_store):
+    rows = rule_change_rows()
+    cid = split_binding.put_certificate(splits.certificate(splits.assign(rows), splits.RULE_V2))
+    write_corpus(tmp_path / "c", monkeypatch, [rows], source="another-quod-run")
+    monkeypatch.setattr(split_binding, "PINS_PATH", pins(tmp_path, {}))
+    for r in (run(split_manifest_cid=cid), run()):
+        with pytest.raises(split_binding.SplitBindingError, match="different corpus"):
+            split_binding.resolve_corpus(r)
+
+
+def test_a_shard_that_does_not_verify_is_refused(tmp_path, monkeypatch, ket_store):
+    from lemma.data.corpus import CorpusError
+    rows = rule_change_rows()
+    ident = write_corpus(tmp_path / "d", monkeypatch, [rows])
+    pin = {"split_rule": splits.RULE_V1, "declarations_shards_blake3": ident["shards_blake3"]}
+    monkeypatch.setattr(split_binding, "PINS_PATH", pins(tmp_path, {"s2-legacy": pin}))
+    shard = tmp_path / "d" / "declarations" / "declarations-0000.jsonl"
+    shard.write_text("".join(r.model_dump_json() + "\n" for r in rows[::-1]))   # edited under its old CID
+    with pytest.raises(CorpusError, match="content hash"):
+        split_binding.resolve_corpus(run())

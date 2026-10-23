@@ -95,6 +95,36 @@ def iter_rows(corpus: str = "declarations", verify: bool = True) -> Iterator[Dec
                     yield DeclarationRow.model_validate_json(line)
 
 
+def shard_order_blake3(entries: list[dict]) -> str:
+    """BLAKE3 of the corpus's shard CIDs in manifest order: with every shard
+    verified, it fixes the exact row order iter_rows yields, which an
+    order-dependent split rule (splits.RULE_V1) depends on."""
+    return blake3.blake3("\n".join(e["cid"] for e in entries).encode()).hexdigest()
+
+
+def read_declarations(corpus: str = "declarations") -> tuple[list[DeclarationRow], dict]:
+    """(rows in iter_rows order, identity of what was read). The manifest is
+    read once, and each shard is verified on the very bytes that are parsed
+    (no verify-then-reopen race). The identity names the producing quod run's
+    manifest CID (the corpus version every run records as corpus_cids[0]) and
+    the shard order, so a split rebuilt over these rows can be tied to the
+    corpus a run trained on (split_binding.resolve_corpus)."""
+    man = load_manifest()
+    shards = man.get("corpora", {}).get(corpus)
+    if not shards:
+        raise CorpusError(f"manifest has no corpus named {corpus!r}")
+    rows: list[DeclarationRow] = []
+    for entry in shards:
+        data = (CORPORA / entry["file"]).read_bytes()
+        actual = blake3.blake3(data).hexdigest()
+        if actual != entry["cid"]:
+            raise CorpusError(f"{entry['file']}: content hash {actual} != manifest CID {entry['cid']}")
+        rows.extend(DeclarationRow.model_validate_json(line) for line in data.decode().splitlines() if line.strip())
+    identity = {"corpus": corpus, "source_manifest_cid": (man.get("source") or {}).get("manifest_cid"),
+                "shards": len(shards), "shards_blake3": shard_order_blake3(shards)}
+    return rows, identity
+
+
 def _iter_shards(corpus: str, verify: bool):
     man = load_manifest()
     shards = man.get("corpora", {}).get(corpus)

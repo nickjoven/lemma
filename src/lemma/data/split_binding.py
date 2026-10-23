@@ -19,6 +19,18 @@ that checkpoint's pretraining), resolves the split here instead:
      confirm the rebuilt rows; callers that have more evidence (evaluate_s2's
      cache report) check it, and the binding is recorded with every number.
 
+In both cases the rows must be the corpus the run trained on: the corpus
+MANIFEST's source CID must be the run's recorded corpus_cids[0], every shard
+is verified, and for the order-dependent RULE_V1 the shard order must be the
+one the pin records (declarations_shards_blake3, from corpora/MANIFEST.yml at
+the pinned commit), since in-shard order is fixed by the shard CIDs. An
+explicit expected rule carries no shard order, so it cannot stand in for a v1
+pin. A v1 reconstruction is therefore "the split rebuilt under the pinned
+rule over the verified recorded corpus", not a split the run sealed.
+Entrypoints call resolve_corpus, which reads the rows and their identity
+together; resolve() trusts its caller that `rows` are the corpus `corpus`
+names.
+
 In both cases the resolved split is sealed as a certificate and its CID is
 returned, so a downstream run records it as its own split_manifest_cid.
 """
@@ -68,11 +80,25 @@ def put_certificate(cert: dict) -> str:
     return ledger.ket_put(json.dumps(cert, sort_keys=True, separators=(",", ":")))
 
 
-def resolve(run: ledger.RunRecord, rows, *, expect_rule: str | None = None,
+def check_corpus(run: ledger.RunRecord, corpus: dict) -> None:
+    """The rows' corpus must be the one the run recorded (corpus_cids[0] is
+    the declarations corpus, inherited from S2 by every later stage)."""
+    recorded = list(run.inputs.corpus_cids)
+    source = corpus.get("source_manifest_cid")
+    if not source or not recorded or recorded[0] != source:
+        raise SplitBindingError(
+            f"run {run.run_id} recorded declarations corpus {recorded[0] if recorded else None}, but the corpus "
+            f"read now is {source}: its split cannot be rebuilt over a different corpus")
+
+
+def resolve(run: ledger.RunRecord, rows, *, corpus: dict, expect_rule: str | None = None,
             pins_path: Path | None = None) -> Binding:
     """The split `run` trained against, rebuilt over `rows` (the declarations
-    corpus in iter_rows order) and checked as far as the record allows."""
+    corpus in iter_rows order, whose identity is `corpus`, as
+    corpus.read_declarations returns it) and checked as far as the record
+    allows."""
     pins_path = pins_path or PINS_PATH
+    check_corpus(run, corpus)
     recorded = run.inputs.split_manifest_cid
     if recorded:
         try:
@@ -101,6 +127,17 @@ def resolve(run: ledger.RunRecord, rows, *, expect_rule: str | None = None,
     if pinned is not None and expect_rule is not None and splits.rule_id(pinned) != splits.rule_id(expect_rule):
         raise SplitBindingError(f"run {run.run_id}: expected rule {expect_rule} contradicts the pin {pinned}")
     rule = splits.rule_id(pinned or expect_rule)
+    if rule == splits.RULE_V1:
+        # order-dependent: the rebuild is the trained split only over the rows in the order the build read them
+        want = pin.get("declarations_shards_blake3") if pinned is not None else None
+        if want is None:
+            raise SplitBindingError(
+                f"run {run.run_id}: {rule} depends on row order, and no pin records the shard order it was built "
+                f"over (declarations_shards_blake3 in {pins_path.name}); an explicit rule cannot supply it")
+        if want != corpus.get("shards_blake3"):
+            raise SplitBindingError(
+                f"run {run.run_id}: the corpus shard order {corpus.get('shards_blake3')} is not the pinned "
+                f"{want}; {rule} would rebuild a different split")
     assignment = splits.assign_under(rule, rows)
     cid = put_certificate(splits.certificate(assignment, rule))
     return Binding(assignment, rule, cid, "pinned_rule_reconstructed",
@@ -108,7 +145,8 @@ def resolve(run: ledger.RunRecord, rows, *, expect_rule: str | None = None,
 
 
 def resolve_corpus(run: ledger.RunRecord, *, expect_rule: str | None = None):
-    """(rows, Binding) over the declarations corpus, in iter_rows order."""
-    from .corpus import iter_rows
-    rows = list(iter_rows("declarations", verify=False))
-    return rows, resolve(run, rows, expect_rule=expect_rule)
+    """(rows, Binding) over the verified declarations corpus, in iter_rows
+    order, tied to the corpus the run recorded."""
+    from . import corpus
+    rows, identity = corpus.read_declarations("declarations")
+    return rows, resolve(run, rows, corpus=identity, expect_rule=expect_rule)

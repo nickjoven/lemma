@@ -212,7 +212,10 @@ class _Harness:
             torch.manual_seed(1)
             return Encoder(small(vocab_size)).eval()
         monkeypatch.setattr(evaluate_s2, "load_encoder", load_encoder)
-        monkeypatch.setattr(evaluate_s2, "iter_rows", lambda *a, **k: iter(rows))
+        from corpus_fixture import SOURCE, write_corpus
+        ident = write_corpus(tmp_path / "corpora", monkeypatch, [rows])
+        for pin in (pins or {}).values():       # a v1 pin records the shard order it was built over
+            pin.setdefault("declarations_shards_blake3", ident["shards_blake3"])
         root = tmp_path / "evalroot"
         (root / "corpora" / "cache").mkdir(parents=True)
         np.save(root / "corpora" / "cache" / "declarations-train.ids.npy", np.arange(4, 4 + len(texts)) % len(vocab))
@@ -223,7 +226,7 @@ class _Harness:
         monkeypatch.setattr(split_binding, "PINS_PATH", self.pins)
 
         self.train = RunRecord(run_id="s2-fixture", kind="train", stage="S2", started=ledger.now_iso(),
-                               inputs=RunInputs(corpus_cids=["corpus"], config_cid="cfg", code_git=ledger.git_head(),
+                               inputs=RunInputs(corpus_cids=[SOURCE], config_cid="cfg", code_git=ledger.git_head(),
                                                 mathlib_pin="pin", split_manifest_cid=split_manifest_cid))
         self.train.checkpoint_cids.append(ledger.ket_put(b"fixture checkpoint"))
         ledger.finish_run(self.train, {"masked_acc": 0.9})

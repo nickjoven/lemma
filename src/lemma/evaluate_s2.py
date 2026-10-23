@@ -40,7 +40,7 @@ from tokenizers import Tokenizer
 
 from . import ledger
 from .data import split_binding, splits
-from .data.corpus import CorpusError, encoder_text, iter_rows
+from .data.corpus import CorpusError, encoder_text
 from .models.encoder import Encoder, EncoderConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -212,9 +212,9 @@ def main() -> int:
     src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
 
     train_rec = ledger.citable(args.run)
-    rows = list(iter_rows("declarations", verify=False))
-    # the split the checkpoint trained against, by evidence; refuses rather than guessing (review of #10)
-    binding = split_binding.resolve(train_rec, rows, expect_rule=args.expect_split_rule)
+    # the split the checkpoint trained against, by evidence, over the verified corpus it recorded;
+    # refuses rather than guessing (review of #10)
+    rows, binding = split_binding.resolve_corpus(train_rec, expect_rule=args.expect_split_rule)
     cache_counts = check_cache_report(args.cache_report, binding.assignment)
     manifest_file_blake3 = check_manifest_file(args.split_manifest, binding) if args.split_manifest else None
     assign = binding.assignment
