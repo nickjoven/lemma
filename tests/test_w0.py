@@ -123,6 +123,7 @@ def test_train_releases_the_best_pair_with_role_labelled_cids(tmp_path, monkeypa
                                    blake3.blake3(target.read_bytes()).hexdigest()]
     assert rec.inputs.split_manifest_cid == binding.certificate_cid
     metrics = json.loads(ledger.ket_get(rec.metrics_cid))["metrics"]
+    assert metrics["split"] == binding.disclosure()     # the binding kind travels with the train record
     assert metrics["checkpoint_roles"] == {"online": rec.checkpoint_cids[0], "ema_target": rec.checkpoint_cids[1]}
     manifest = json.loads(ledger.ket_get_verified(metrics["checkpoint_manifest_cid"]))
     assert [c["role"] for c in manifest["checkpoints"]] == ["online", "ema_target"]

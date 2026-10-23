@@ -32,7 +32,14 @@ together; resolve() trusts its caller that `rows` are the corpus `corpus`
 names.
 
 In both cases the resolved split is sealed as a certificate and its CID is
-returned, so a downstream run records it as its own split_manifest_cid.
+returned, so a downstream run records it as its own split_manifest_cid. A
+certificate made by a pinned rebuild carries that provenance (binding, pin
+source, pinned run, corpus identity) inside its own bytes, so a run trained
+on top of a pinned run, and that run's evaluation, reports the WEAKEST link
+in the chain (pinned_rule_reconstructed, naming the pinned run), never
+train_record_cid: the certificate binds the downstream run's eval split to
+the downstream run's training exactly, but the init checkpoint's
+pretraining split is still only a reconstruction.
 """
 
 from __future__ import annotations
@@ -55,17 +62,22 @@ class SplitBindingError(CorpusError):
     pass
 
 
+PINNED = "pinned_rule_reconstructed"
+
+
 @dataclass
 class Binding:
     assignment: dict[str, str]
     rule_id: str
     certificate_cid: str
-    binding: str                  # "train_record_cid" | "pinned_rule_reconstructed"
+    binding: str                  # the weakest link: "train_record_cid" | "pinned_rule_reconstructed"
     pin_source: str | None = None  # where the rule pin came from, when binding is a pin
+    pinned_run: str | None = None  # the run whose split was reconstructed under that pin
 
     def disclosure(self) -> dict:
         return {"split_manifest_cid": self.certificate_cid, "split_rule": self.rule_id,
-                "split_manifest_binding": self.binding, "split_pin_source": self.pin_source}
+                "split_manifest_binding": self.binding, "split_pin_source": self.pin_source,
+                "split_pinned_run": self.pinned_run}
 
 
 def load_pins(path: Path | None = None) -> dict:
@@ -115,7 +127,13 @@ def resolve(run: ledger.RunRecord, rows, *, corpus: dict, expect_rule: str | Non
         if why:
             raise SplitBindingError(f"run {run.run_id}: the split rebuilt under {rule} is not the one it "
                                     f"trained against ({why}); the corpus or the rule changed")
-        return Binding(assignment, rule, recorded, "train_record_cid")
+        prov = cert.get("provenance")
+        if prov is None:
+            return Binding(assignment, rule, recorded, "train_record_cid")
+        if not isinstance(prov, dict) or prov.get("binding") != PINNED:
+            raise SplitBindingError(f"run {run.run_id}: split_manifest_cid {recorded} has an unknown provenance {prov!r}")
+        # trained on top of a pinned rebuild: the chain is only as strong as that rebuild
+        return Binding(assignment, rule, recorded, PINNED, prov.get("pin_source"), prov.get("pinned_run"))
 
     pin = load_pins(pins_path).get(run.run_id)
     pinned = pin.get("split_rule") if isinstance(pin, dict) else None
@@ -139,9 +157,11 @@ def resolve(run: ledger.RunRecord, rows, *, corpus: dict, expect_rule: str | Non
                 f"run {run.run_id}: the corpus shard order {corpus.get('shards_blake3')} is not the pinned "
                 f"{want}; {rule} would rebuild a different split")
     assignment = splits.assign_under(rule, rows)
-    cid = put_certificate(splits.certificate(assignment, rule))
-    return Binding(assignment, rule, cid, "pinned_rule_reconstructed",
-                   f"configs/{pins_path.name}" if pinned is not None else "explicit")
+    source = f"configs/{pins_path.name}" if pinned is not None else "explicit"
+    cert = splits.certificate(assignment, rule)
+    cert["provenance"] = {"binding": PINNED, "pin_source": source, "pinned_run": run.run_id,
+                          "corpus": {k: corpus.get(k) for k in ("source_manifest_cid", "shards_blake3")}}
+    return Binding(assignment, rule, put_certificate(cert), PINNED, source, run.run_id)
 
 
 def resolve_corpus(run: ledger.RunRecord, *, expect_rule: str | None = None):

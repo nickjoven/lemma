@@ -217,6 +217,7 @@ def main() -> int:
         "steps": steps, "train_pairs": len(train), "train_iff": n_iff,
         "val_iff_mrr_best": round(best_mrr, 4), "best_step": best_step,
         "hard_negatives": f"module-grouped batches, {per_module} per module",
+        "split": binding.disclosure(),
     }, started_monotonic=t0)
     print(f"run {run_id} sealed; metrics_cid {rec.metrics_cid}", flush=True)
     return 0

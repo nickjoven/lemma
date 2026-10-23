@@ -178,7 +178,8 @@ def main() -> int:
         with open(gi, "a") as f: f.write(f"{line}\n")
     ledger.finish_run(rec, metrics={"final_loss": float(np.mean(losses[-100:])), "steps": steps,
                                     "train_mutants": len(train), "val_macro_f1_elab_best": round(best_f1, 4),
-                                    "best_step": best_step, "ood_operator": cfg.get("ood_operator")},
+                                    "best_step": best_step, "ood_operator": cfg.get("ood_operator"),
+                                    "split": binding.disclosure()},
                       started_monotonic=t0)
     print(f"run {run_id} sealed; metrics_cid {rec.metrics_cid}", flush=True)
     return 0

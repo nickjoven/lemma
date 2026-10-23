@@ -123,15 +123,49 @@ def test_w0_transitions_inherit_the_trained_split(corpus_rows, monkeypatch):
     assert not test_dem & moved(corpus_rows)
 
 
-def test_new_runs_record_the_certificate_they_inherit(corpus_rows):
+def test_new_runs_record_the_certificate_they_inherit_and_its_weakest_link(corpus_rows):
     """A downstream trainer records its init run's split; evaluating it later
-    resolves by that CID, not by a pin."""
+    resolves by that CID, not by a pin, but the binding it reports is the
+    weakest link of the chain: the init run's split was only reconstructed
+    under a pin, so the downstream eval says so and names the pinned run
+    (second review of #10: it used to report train_record_cid)."""
+    from lemma import ledger
     from lemma.train_s3 import gloss_pairs
     _, at_train = gloss_pairs("train", legacy())
+    assert at_train.binding == "pinned_rule_reconstructed" and at_train.pinned_run == "legacy-run"
     s3 = legacy("s3-new")
     s3.inputs.split_manifest_cid = at_train.certificate_cid
     _, at_eval = gloss_pairs("test", s3)
-    assert at_eval.binding == "train_record_cid" and at_eval.assignment == at_train.assignment
+    assert at_eval.assignment == at_train.assignment and at_eval.certificate_cid == at_train.certificate_cid
+    assert at_eval.binding == "pinned_rule_reconstructed"
+    assert at_eval.disclosure()["split_pinned_run"] == "legacy-run"
+    assert at_eval.pin_source == at_train.pin_source == "configs/pins.yml"
+    # the provenance is in the certificate's own bytes, so it survives any number of generations
+    cert = json.loads(ledger.ket_get_verified(at_train.certificate_cid))
+    assert cert["provenance"]["binding"] == "pinned_rule_reconstructed"
+    s4 = legacy("s4-on-s3")
+    s4.inputs.split_manifest_cid = at_eval.certificate_cid
+    assert gloss_pairs("test", s4)[1].binding == "pinned_rule_reconstructed"
+
+
+def test_a_certificate_with_unknown_provenance_is_refused(corpus_rows):
+    from lemma.train_s3 import gloss_pairs
+    cert = splits.certificate(splits.assign(corpus_rows), splits.RULE_V2)
+    cert["provenance"] = {"binding": "train_record_cid"}     # a provenance claiming the strong binding
+    run = legacy("forged")
+    run.inputs.split_manifest_cid = split_binding.put_certificate(cert)
+    with pytest.raises(split_binding.SplitBindingError, match="unknown provenance"):
+        gloss_pairs("test", run)
+
+
+@pytest.mark.parametrize("fname", ["train_s3.py", "train_s4.py", "train_s4v2.py", "train_s5.py", "train_w0.py",
+                                   "w0_baselines.py", "evaluate_s2.py", "evaluate_s3.py", "evaluate_s4.py",
+                                   "evaluate_s4v2.py", "evaluate_s5.py"])
+def test_every_split_binding_run_records_the_disclosure(fname):
+    """The binding kind and pin source go into the sealed metrics of every run
+    that resolves a split, trainers included."""
+    tree = ast.parse((SRC / fname).read_text())
+    assert any(isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "disclosure" for n in ast.walk(tree)), fname
 
 
 @pytest.mark.parametrize("fname", ["train_s3.py", "train_s4.py", "train_s4v2.py", "train_s5.py", "train_w0.py",

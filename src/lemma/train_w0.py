@@ -248,7 +248,8 @@ def train(args) -> int:
                                            {"role": "ema_target", "cid": tcid, "file": tgt_path.name}],
                            "tactics_cid": ledger.ket_put(tactics_path.read_bytes())}
     manifest_cid = ledger.ket_put_json(checkpoint_manifest)
-    ledger.finish_run(rec, metrics={"steps": steps, "final_loss": float(np.mean([l[0] for l in losses[-100:]])),
+    ledger.finish_run(rec, metrics={"split": binding.disclosure(),
+                                    "steps": steps, "final_loss": float(np.mean([l[0] for l in losses[-100:]])),
                                     "train_rows": len(train_rows), "train_single_step": len(train_single),
                                     "val_mrr_best": round(pair.best, 4), "best_step": pair.best_step, "tactics": tactics,
                                     "checkpoint_manifest_cid": manifest_cid,
