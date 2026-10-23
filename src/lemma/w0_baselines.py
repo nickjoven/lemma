@@ -127,6 +127,7 @@ def main() -> int:
     ap.add_argument("--translation-margin", type=float, default=0.03)
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
     rng = random.Random(args.seed)
     t0 = time.monotonic()
 
@@ -202,7 +203,7 @@ def main() -> int:
                                 config_cid=cfg_cid, init_checkpoint_cid=s2_rec.checkpoint_cids[-1],
                                 code_git=ledger.git_head(), mathlib_pin=s2_rec.inputs.mathlib_pin),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
-    ledger.start_run(rec)
+    ledger.start_run(rec, preflight=src_state)
     ledger.finish_run(rec, results, started_monotonic=t0)
     print(json.dumps({**results, "metrics_cid": rec.metrics_cid}, indent=1))
     return 0

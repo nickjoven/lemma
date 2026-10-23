@@ -140,6 +140,7 @@ def main() -> int:
     ap.add_argument("--config", type=Path, required=True)
     ap.add_argument("--run-id", default=None)
     args = ap.parse_args()
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
     cfg = yaml.safe_load(args.config.read_text())
     config_cid = ledger.ket_put(args.config.read_bytes())
     run_id = args.run_id or f"s3-gloss-{time.strftime('%Y%m%d-%H%M%S')}"
@@ -175,7 +176,7 @@ def main() -> int:
                                 code_git=ledger.git_head(), mathlib_pin=s2_rec.inputs.mathlib_pin),
         seed=cfg.get("seed", 1337),
         hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu",
-                  "torch": torch.__version__}))
+                  "torch": torch.__version__}), preflight=src_state)
 
     t0 = time.monotonic()
     rng = np.random.default_rng(cfg.get("seed", 1337))

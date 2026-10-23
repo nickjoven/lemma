@@ -54,6 +54,7 @@ def main() -> int:
     ap.add_argument("--run", required=True)
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
     rng = random.Random(args.seed)
 
     train_rec = ledger.citable(args.run)
@@ -140,7 +141,7 @@ def main() -> int:
                                 init_checkpoint_cid=train_rec.checkpoint_cids[-1],
                                 code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
-    ledger.start_run(rec)
+    ledger.start_run(rec, preflight=src_state)
     rec.calibration_record_cid = ledger.ket_put_json(calib)
     ledger.finish_run(rec, metrics, started_monotonic=t0,
                       status="completed" if calib["pass"] else "calibration_failed")

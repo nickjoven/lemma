@@ -220,15 +220,24 @@
     module overlap with the number.
 - id: L-10
   severity: high
-  status: fix-pending (start_run now refuses a source tree that differs from code_git, or seals the exact changed bytes under LEMMA_DIRTY_SOURCE=snapshot)
+  status: fix-pending (start_run now refuses a source tree that differs from code_git, or seals the exact changed bytes under LEMMA_DIRTY_SOURCE=snapshot; scope is SOURCE_PATHS only)
   title: sealed run s2-eval-s2-mlm-20260909-141736 records a code_git that does not contain its evaluator
   detail: >
     inputs.code_git = 804d8cca..., but src/lemma/evaluate_s2.py first appears
     at 022fe90. git_head() recorded HEAD without checking the working tree.
     The record is preserved as is; its provenance is incomplete and no commit
     is guessed for it (github issue #8).
-  fix: none for the old record; every new record carries code_git_dirty and
-    source_snapshot_cid when the tree was not the commit.
+  fix: >
+    none for the old record. New records name the checked-out commit and,
+    when the tree was not that commit, carry code_git_dirty and
+    source_snapshot_cid. The check covers SOURCE_PATHS (src/, configs/,
+    pyproject.toml, uv.lock) and nothing else: gitignored inputs (corpora,
+    caches, checkpoints), scripts/, and the ket binary are out of scope, so
+    a record says which commit's source ran, not that the whole environment
+    is reproduced. Every entrypoint runs preflight_source before its compute
+    and passes the result to start_run, which refuses if the source changed
+    in between; runs outside a git checkout, and code_git = "no-git", are
+    refused.
 - id: L-11
   severity: high
   status: fix-pending (BestPair saves the online model and the EMA target together at each best step; a role-labelled checkpoint manifest is sealed; the released run is not rerun)

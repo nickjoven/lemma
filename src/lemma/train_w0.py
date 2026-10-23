@@ -144,6 +144,7 @@ def predict_states(model, tok, rows, max_seq, device, bs=128):
 
 
 def train(args) -> int:
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
     cfg = yaml.safe_load(args.config.read_text())
     config_cid = ledger.ket_put(args.config.read_bytes())
     run_id = args.run_id or f"w0-world-{time.strftime('%Y%m%d-%H%M%S')}"
@@ -176,7 +177,7 @@ def train(args) -> int:
                                 tokenizer_cid=s2_rec.inputs.tokenizer_cid, config_cid=config_cid,
                                 init_checkpoint_cid=s2_rec.checkpoint_cids[-1], code_git=ledger.git_head(),
                                 mathlib_pin=s2_rec.inputs.mathlib_pin),
-        seed=cfg.get("seed", 1337), hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu", "torch": torch.__version__}))
+        seed=cfg.get("seed", 1337), hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu", "torch": torch.__version__}), preflight=src_state)
     t0 = time.monotonic()
     rng = np.random.default_rng(cfg.get("seed", 1337))
     bs, steps, val_every = cfg.get("batch_size", 64), cfg.get("steps", 4000), cfg.get("val_every", 250)
@@ -254,6 +255,7 @@ def train(args) -> int:
 
 
 def evaluate(args) -> int:
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
     cfg = yaml.safe_load(args.config.read_text())
     rng = random.Random(args.seed)
     train_rec = ledger.citable(args.run)
@@ -329,7 +331,7 @@ def evaluate(args) -> int:
                                                    config_cid=train_rec.inputs.config_cid, init_checkpoint_cid=train_rec.checkpoint_cids[0],
                                                    code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
                            seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
-    ledger.start_run(rec)
+    ledger.start_run(rec, preflight=src_state)
     rec.calibration_record_cid = ledger.ket_put_json(calib)
     ledger.finish_run(rec, metrics, started_monotonic=t0, status="completed" if calib["pass"] else "calibration_failed")
     print(json.dumps({**metrics, "calibration_pass": calib["pass"], "metrics_cid": rec.metrics_cid}, indent=1))

@@ -163,7 +163,7 @@ def main() -> int:
     ap.add_argument("--split-manifest", type=Path, default=REPO_ROOT / "corpora" / "cache" / "split-manifest.json",
                     help="the split manifest the checkpoint's training cache was built from")
     args = ap.parse_args()
-    ledger.preflight_source()   # refuse a dirty tree before the GPU work, not after
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
 
     train_rec = ledger.citable(args.run)
     ckpt = REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors"
@@ -259,7 +259,7 @@ def main() -> int:
                                 code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin,
                                 split_manifest_cid=split_manifest_cid),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
-    ledger.start_run(rec)
+    ledger.start_run(rec, preflight=src_state)
     rec.calibration_record_cid = ledger.ket_put_json(calib)
     ledger.finish_run(rec, metrics, started_monotonic=t0,
                       status="completed" if calib["pass"] else "calibration_failed")
