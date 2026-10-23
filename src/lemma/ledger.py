@@ -88,15 +88,26 @@ def git_head() -> str:
 SOURCE_PATHS = ("src", "configs", "pyproject.toml", "uv.lock")
 
 
+class NotACheckoutError(LedgerError):
+    pass
+
+
 def source_state(repo: Path | None = None) -> dict:
-    """{"head": <commit or no-git>, "dirty": bool, "changed": [paths]} for the
-    source paths: `changed` lists every tracked file that differs from HEAD and
-    every untracked, non-ignored file (git status --porcelain, untracked=all)."""
+    """{"head": <commit>, "dirty": bool, "changed": [paths]} for the source
+    paths: `changed` lists every tracked file that differs from HEAD and every
+    untracked, non-ignored file (git status --porcelain, untracked=all).
+
+    Outside a git checkout there is no commit to name and no diff to seal, so
+    this refuses (NotACheckoutError) instead of returning a placeholder: the
+    earlier `{"<not a git checkout>": null}` snapshot was a CID that recovered
+    nothing, recorded as if it were provenance (review of #10)."""
     repo = repo or REPO_ROOT
     head = subprocess.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
                           capture_output=True, text=True, check=False)
     if head.returncode != 0:
-        return {"head": "no-git", "dirty": True, "changed": ["<not a git checkout>"]}
+        raise NotACheckoutError(
+            f"{repo} is not a git checkout with a commit: the source that runs cannot be named "
+            "or sealed, so no run is recorded from here")
     st = subprocess.run(["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=all",
                          "--", *SOURCE_PATHS], capture_output=True, text=True, check=True)
     changed = sorted(_porcelain_path(line) for line in st.stdout.splitlines() if line.strip())
@@ -108,6 +119,7 @@ def source_snapshot(changed: list[str], repo: Path | None = None) -> str:
     goes to the store under its own CID and the {path: cid} manifest's CID is
     returned, so the code that ran is recoverable from the record alone."""
     repo = repo or REPO_ROOT
+    base = source_state(repo)["head"]   # refuses outside a checkout: a snapshot needs a base commit
     files = {}
     for rel in changed:
         path = repo / rel
@@ -115,7 +127,7 @@ def source_snapshot(changed: list[str], repo: Path | None = None) -> str:
             files[rel] = ket_put(path.read_bytes())
         else:
             files[rel] = None  # deleted relative to HEAD
-    return ket_put_json({"base_commit": git_head(), "files": files})
+    return ket_put_json({"base_commit": base, "files": files})
 
 
 def _porcelain_path(line: str) -> str:
@@ -134,17 +146,25 @@ class DirtySourceError(LedgerError):
     pass
 
 
-def preflight_source(dirty_source: str | None = None) -> None:
+def preflight_source(dirty_source: str | None = None) -> dict:
     """start_run's source-provenance refusal, callable BEFORE any compute: a
     dirty tree under the reject policy is refused here instead of after the GPU
-    work and the evidence puts. start_run repeats the check; this only moves
-    the refusal earlier."""
+    work and the evidence puts.
+
+    Returns the source state it saw (with the snapshot CID of the changed
+    bytes under the snapshot policy). Pass it to start_run(preflight=...): an
+    evaluator calls start_run only after its compute, and start_run then
+    refuses if the source changed in between, so a tree edited mid-run is not
+    recorded as the clean commit it was at the end (review of #10)."""
     state = source_state()
     policy = dirty_source or os.environ.get("LEMMA_DIRTY_SOURCE", "reject")
     if state["dirty"] and policy != "snapshot":
         raise DirtySourceError(
             "source differs from the checked-out commit; commit first, or seal the exact bytes with "
             f"LEMMA_DIRTY_SOURCE=snapshot: {', '.join(state['changed'])}")
+    if state["dirty"]:
+        state = {**state, "snapshot_cid": source_snapshot(state["changed"])}
+    return state
 
 
 def now_iso() -> str:
@@ -157,7 +177,8 @@ def append(record: RunRecord) -> None:
         f.write(record.model_dump_json() + "\n")
 
 
-def start_run(record: RunRecord, *, dirty_source: str | None = None) -> RunRecord:
+def start_run(record: RunRecord, *, dirty_source: str | None = None,
+              preflight: dict | None = None) -> RunRecord:
     """Record the run's intent before any compute. Inputs must already be CIDs.
 
     Provenance (lemma #8): `inputs.code_git` names a commit, so the source
@@ -166,11 +187,20 @@ def start_run(record: RunRecord, *, dirty_source: str | None = None) -> RunRecor
     exact bytes of the changed files to be sealed into the store first; the
     record then carries `source_snapshot_cid` and `code_git_dirty=True` so a
     reader can tell an exact commit from a commit-plus-snapshot.
+
+    Scope: only SOURCE_PATHS are checked and sealed. Gitignored files,
+    scripts/, and the `ket` binary are outside it (the ket sha is recorded
+    separately where a caller records it).
+
+    `code_git` must be the checked-out HEAD exactly; "no-git" is refused (it
+    used to be accepted even when a HEAD existed), and so is a run started
+    outside a git checkout. `preflight` is the state preflight_source returned
+    before the compute; if given, the source must not have changed since.
     """
     if not record.inputs.config_cid:
         raise LedgerError("a run without a config_cid is not startable")
     state = source_state()
-    if record.inputs.code_git not in ("no-git", state["head"]):
+    if record.inputs.code_git != state["head"]:
         raise LedgerError(f"inputs.code_git {record.inputs.code_git} is not the checked-out HEAD {state['head']}")
     if state["dirty"]:
         policy = dirty_source or os.environ.get("LEMMA_DIRTY_SOURCE", "reject")
@@ -178,7 +208,15 @@ def start_run(record: RunRecord, *, dirty_source: str | None = None) -> RunRecor
             raise DirtySourceError(
                 "source differs from the recorded commit; commit first, or seal the exact bytes with "
                 f"LEMMA_DIRTY_SOURCE=snapshot: {', '.join(state['changed'])}")
-        record.inputs.source_snapshot_cid = source_snapshot(state["changed"])
+        state = {**state, "snapshot_cid": source_snapshot(state["changed"])}
+    if preflight is not None:
+        keys = ("head", "dirty", "changed", "snapshot_cid")
+        if any(preflight.get(k) != state.get(k) for k in keys):
+            raise DirtySourceError(
+                "source changed between preflight and start_run (during the compute): "
+                f"before {({k: preflight.get(k) for k in keys})}, now {({k: state.get(k) for k in keys})}")
+    if state["dirty"]:
+        record.inputs.source_snapshot_cid = state["snapshot_cid"]
         record.inputs.code_git_dirty = True
     record.started = record.started or now_iso()
     append(record)

@@ -139,3 +139,57 @@ def test_snapshot_policy_seals_the_exact_changed_bytes(tmp_path, monkeypatch, cl
     assert set(manifest["files"]) == {"src/evaluator.py", "src/evaluate_new.py"}
     assert ledger.ket_get_verified(manifest["files"]["src/evaluator.py"]) == b"print('v2')\n"
     assert ledger.ket_get_verified(manifest["files"]["src/evaluate_new.py"]) == b"print('new')\n"
+
+
+# review of #10: provenance outside a checkout, "no-git", and mid-run edits
+
+def test_outside_a_git_checkout_nothing_is_recorded(tmp_path, monkeypatch):
+    ket_store(tmp_path, monkeypatch)
+    bare = tmp_path / "not-a-checkout"
+    (bare / "src").mkdir(parents=True)
+    (bare / "src" / "evaluator.py").write_text("print('v1')\n")
+    monkeypatch.setattr(ledger, "REPO_ROOT", bare)
+    rec = record("t-nogit")
+    assert rec.inputs.code_git == "no-git"
+    with pytest.raises(ledger.NotACheckoutError):
+        ledger.preflight_source()
+    with pytest.raises(ledger.NotACheckoutError):
+        ledger.start_run(rec, dirty_source="snapshot")
+    with pytest.raises(ledger.NotACheckoutError):
+        ledger.source_snapshot(["src/evaluator.py"])
+    assert not (tmp_path / "ledger.jsonl").exists()
+
+
+def test_no_git_is_refused_when_a_head_exists(tmp_path, monkeypatch):
+    monkeypatch.setattr(ledger, "LEDGER", tmp_path / "ledger.jsonl")
+    rec = record("t-claims-no-git")
+    rec.inputs.code_git = "no-git"
+    with pytest.raises(ledger.LedgerError, match="not the checked-out HEAD"):
+        ledger.start_run(rec)
+
+
+def test_source_edited_between_preflight_and_start_run_is_refused(tmp_path, monkeypatch, clean_repo):
+    monkeypatch.setattr(ledger, "LEDGER", tmp_path / "ledger.jsonl")
+    state = ledger.preflight_source()
+    # the evaluator's compute runs here; someone edits the source and commits it
+    (clean_repo / "src" / "evaluator.py").write_text("print('v2')\n")
+    subprocess.run(["git", "-C", str(clean_repo), "commit", "-qam", "v2"], check=True)
+    rec = record("t-midrun")          # code_git is now the new, clean HEAD
+    with pytest.raises(ledger.DirtySourceError, match="between preflight and start_run"):
+        ledger.start_run(rec, preflight=state)
+
+
+def test_snapshot_bytes_edited_between_preflight_and_start_run_are_refused(tmp_path, monkeypatch, clean_repo):
+    ket_store(tmp_path, monkeypatch)
+    (clean_repo / "src" / "evaluator.py").write_text("print('v2')\n")
+    state = ledger.preflight_source(dirty_source="snapshot")
+    (clean_repo / "src" / "evaluator.py").write_text("print('v3')\n")   # same path list, other bytes
+    with pytest.raises(ledger.DirtySourceError, match="between preflight and start_run"):
+        ledger.start_run(record("t-midrun-snap"), dirty_source="snapshot", preflight=state)
+
+
+def test_unchanged_source_passes_preflight_binding(tmp_path, monkeypatch):
+    monkeypatch.setattr(ledger, "LEDGER", tmp_path / "ledger.jsonl")
+    state = ledger.preflight_source()
+    rec = ledger.start_run(record("t-same"), preflight=state)
+    assert rec.inputs.code_git == state["head"]
