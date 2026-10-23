@@ -201,7 +201,7 @@ def main() -> int:
     ap.add_argument("--groups", type=int, default=2000, help="same-lock groups to sample")
     ap.add_argument("--distractors", type=int, default=10000)
     ap.add_argument("--seed", type=int, default=1337)
-    ap.add_argument("--split", default="test", help="held-out split to evaluate on")
+    ap.add_argument("--split", default="test", choices=["test", "val"], help="held-out split to evaluate on")
     ap.add_argument("--expect-split-rule", default=None, choices=sorted(splits.ASSIGNERS),
                     help="the split rule the run trained under; must agree with its record or pin")
     ap.add_argument("--cache-report", type=Path, default=REPO_ROOT / "corpora" / "cache" / "cache-report.json",

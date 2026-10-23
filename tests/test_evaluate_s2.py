@@ -328,3 +328,14 @@ def test_cross_module_duplicate_group_is_held_out_whole():
     v1 = splits.assign_v1(rows)
     _, _, legacy = heldout_pool(rows, v1, 1000, 1000, random.Random(0))
     assert legacy["modules_shared_with_other_splits"] >= 1
+
+
+def test_split_flag_accepts_only_held_out_splits(monkeypatch, capsys):
+    """Second review of #10: --split train would report a training-set number as held out."""
+    import sys
+
+    from lemma import evaluate_s2
+    monkeypatch.setattr(sys, "argv", ["evaluate_s2", "--run", "x", "--split", "train"])
+    with pytest.raises(SystemExit) as e:
+        evaluate_s2.main()
+    assert e.value.code == 2 and "invalid choice" in capsys.readouterr().err
