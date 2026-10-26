@@ -1,0 +1,107 @@
+# Split-rule pins for runs that record no split_manifest_cid (every run sealed
+# before lemma #10). lemma.data.split_binding refuses to evaluate such a run,
+# or to train on top of it, unless its rule is pinned here or passed
+# explicitly; it never falls back to today's rule.
+#
+# Evidence for each pin: the run's recorded code_git (must equal the train
+# record's in runs/ledger.jsonl), the blob of src/lemma/data/splits.py at that
+# commit, and declarations_shards_blake3, the BLAKE3 of the declarations shard
+# CIDs in corpora/MANIFEST.yml order at that commit (corpus.shard_order_blake3).
+# v1 is order-dependent: split_binding refuses to rebuild it unless the corpus
+# MANIFEST's source CID is the run's corpus_cids[0], every shard verifies, and
+# the shard order equals this digest. Both blobs listed below have an assign()
+# whose body is AST-equal to splits.assign_v1's, docstring aside (b0d106c only
+# adds assign_transitions). Limit: these records predate the dirty-tree check
+# (L-10), so that the tree matched code_git is not verified; a pin is a
+# statement about code and corpus history, not a sealed split. For three runs
+# the tree provably did NOT match code_git: s3-smoke and
+# s3-gloss-20260910-174141 (code_git 022fe90, which has no train_s3.py) and
+# s5-smoke (code_git a3b3c5a, which has no train_s5.py). Each started minutes
+# before its trainer's first commit (e596d94, 396ead3), so it ran an
+# uncommitted trainer. The v1 pin is still the best evidence for them:
+# src/lemma/data is byte-identical from 022fe90 to e596d94 and from a3b3c5a to
+# 396ead3, and the first committed train_s3.py (e596d94, gloss_pairs) and
+# train_s5.py (396ead3) take their split from splits.assign, which at those
+# commits is this v1 rule. That the uncommitted trainer did the same is
+# inferred, not recorded.
+# tests/test_split_binding.py re-checks all of it against git history,
+# including that every other pin's stage trainer exists at its code_git (it
+# fails, not skips, in a full clone that lacks a commit; a shallow clone skips
+# only the pins whose commits it lacks, and names them).
+#
+# Owed (OPEN.yml L-9): the s2 cache's split-manifest.json on the GPU box, if it
+# is still the one the checkpoint trained on, should be checked against the
+# v1 reconstruction (evaluate_s2 --split-manifest) and its BLAKE3 recorded.
+runs:
+  s2-mlm-20260909-141736:
+    # code_git is the TRAIN commit; build_cache ran at an unrecorded commit.
+    # splits.py assign() is unchanged from c283a57 (module-level split) to
+    # bfc9556; evaluate_s2 also requires the v1 rebuild to reproduce the
+    # per-split counts of corpora/cache/cache-report.json.
+    split_rule: v1-module-lock-follows-first
+    code_git: a37d73e4b7487e63759230ec910b4e2cb58a83c1
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  s3-smoke:
+    # code_git has no train_s3.py; ran before its first commit e596d94 (see header)
+    split_rule: v1-module-lock-follows-first
+    code_git: 022fe9026448f787e316ec9aa3978133e9dc8d1f
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  s3-gloss-20260910-174141:
+    # code_git has no train_s3.py; ran before its first commit e596d94 (see header)
+    split_rule: v1-module-lock-follows-first
+    code_git: 022fe9026448f787e316ec9aa3978133e9dc8d1f
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  s3v2-smoke:
+    split_rule: v1-module-lock-follows-first
+    code_git: 2eb395344c36ff255a8b1361c7d443a3206447b5
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  s3-gloss-20260911-012141:
+    split_rule: v1-module-lock-follows-first
+    code_git: 2eb395344c36ff255a8b1361c7d443a3206447b5
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  s5-smoke:
+    # code_git has no train_s5.py; ran before its first commit 396ead3 (see header)
+    split_rule: v1-module-lock-follows-first
+    code_git: a3b3c5a88201d6f6a5f99ca4c6281acf8949fda4
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  s4-smoke:
+    split_rule: v1-module-lock-follows-first
+    code_git: 75a950fce0f9e29e563a9d744ac01dfc35e7dc2a
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  s4-smoke2:
+    split_rule: v1-module-lock-follows-first
+    code_git: b1caa07952b442128fe4b2c488a690d48b1b50d4
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  s5-equiv-20260911-125959:
+    split_rule: v1-module-lock-follows-first
+    code_git: 396ead39be8a937c16a6440ec89c506428495a2e
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  s4-verdict-20260911-152400:
+    split_rule: v1-module-lock-follows-first
+    code_git: ce5b4ed859e0843e9474fe9105ba7f4da61064d9
+    splits_py_blob: 524a2b447f383761d70f120dc673c05b662adb6e
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  s4v2-verdict-20260911-223439:
+    split_rule: v1-module-lock-follows-first
+    code_git: 13d42dc34cda3b8ed26bf4cfdfa5627254557be1
+    splits_py_blob: b0d106ca5b607aed8c52655927cf61cf850a1bf5
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  w0-world-20260912-012400:
+    split_rule: v1-module-lock-follows-first
+    code_git: 04721673ac3119afb7baacc0d3260d08e72fddc3
+    splits_py_blob: b0d106ca5b607aed8c52655927cf61cf850a1bf5
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb
+  w0-world-20260912-124023:
+    split_rule: v1-module-lock-follows-first
+    code_git: 6661b30354ec669128b8094d3e2af5d1d993893b
+    splits_py_blob: b0d106ca5b607aed8c52655927cf61cf850a1bf5
+    declarations_shards_blake3: da70973545a52637e3dc2b900f127b25aba41b4c9933765a95295f76f3fd4ccb

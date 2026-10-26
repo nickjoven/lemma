@@ -37,11 +37,47 @@ def collate(batch: list[np.ndarray], pad_id: int, max_seq: int) -> torch.Tensor:
     return out
 
 
+def record_cache_split(cache_dir: Path) -> str:
+    """Seal the certificate of the split the cache in `cache_dir` was built
+    from; refuses a cache without its manifest, a manifest without a known
+    rule id, or one whose counts are not the cache report's. A component-rule
+    (v2) manifest must also pass the L-12 guard on the component statistics
+    it discloses, or carry build_cache's l12_override, which then goes into
+    the certificate (and so into the train record's split_manifest_cid)."""
+    import json
+
+    from .data import split_binding, splits
+    split_manifest, report = cache_dir / "split-manifest.json", cache_dir / "cache-report.json"
+    for f in (split_manifest, report):
+        if not f.is_file():
+            raise SystemExit(f"{f} is missing: a cache without its split manifest and report "
+                             "cannot support a later held-out evaluation")
+    manifest = json.loads(split_manifest.read_text())
+    if "rule_id" not in manifest:
+        raise SystemExit(f"{split_manifest} names no rule_id (built before #10); rebuild the cache")
+    cert = splits.certificate(manifest["assignment"], manifest["rule_id"])
+    if cert["rule_id"] == splits.RULE_V2:
+        largest = (manifest.get("components") or {}).get("largest_component_rows")
+        if largest is None:
+            raise SystemExit(f"{split_manifest} discloses no component statistics; the L-12 guard cannot be checked")
+        frac = largest / max(len(manifest["assignment"]), 1)
+        if frac > splits.GIANT_COMPONENT_MAX_FRACTION and manifest.get("l12_override") is not True:
+            raise SystemExit(f"{split_manifest}: the largest component holds {frac:.1%} of the rows, over the "
+                             f"L-12 guard, and the manifest records no l12_override (OPEN.yml L-12)")
+        if manifest.get("l12_override") is True:
+            cert["l12_override"] = True
+    want = {s: v["sequences"] for s, v in json.loads(report.read_text())["splits"].items()}
+    if {s: cert["counts"].get(s, 0) for s in want} != want:
+        raise SystemExit(f"split manifest counts {cert['counts']} differ from the cache report {want}")
+    return split_binding.put_certificate(cert)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", type=Path, required=True)
     ap.add_argument("--run-id", default=None)
     args = ap.parse_args()
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
 
     cfg = yaml.safe_load(args.config.read_text())
     config_cid = ledger.ket_put(args.config.read_bytes())
@@ -52,6 +88,13 @@ def main() -> int:
 
     tok = Tokenizer.from_file(cfg["tokenizer_path"])
     cache = CachedStatements(REPO_ROOT / cfg["cache_dir"], cfg["cache_name"])
+    # the split this checkpoint trains against, by CID (lemma #5): a
+    # splits.certificate (rule id + per-split name digests), which every
+    # evaluator and downstream trainer verifies a rebuild against
+    # (split_binding.resolve). Not the full manifest: at ~296k names that is
+    # 15-20 MB per run in the git-tracked store, and the certificate pins the
+    # same assignment exactly (review of #10).
+    split_manifest_cid = record_cache_split(REPO_ROOT / cfg["cache_dir"])
     enc_cfg = EncoderConfig(vocab_size=tok.get_vocab_size(), **cfg.get("encoder", {}))
     model = Encoder(enc_cfg).to(device)
     head = MLMHead(model).to(device)
@@ -70,12 +113,13 @@ def main() -> int:
         run_id=run_id, kind="train", stage="S2", started=ledger.now_iso(),
         inputs=ledger.RunInputs(
             corpus_cids=cfg.get("corpus_cids", []),
+            split_manifest_cid=split_manifest_cid,
             tokenizer_cid=cfg.get("tokenizer_cid"),
             config_cid=config_cid, code_git=ledger.git_head(),
             mathlib_pin=cfg["mathlib_pin"]),
         seed=cfg.get("seed", 1337),
         hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu",
-                  "torch": torch.__version__}))
+                  "torch": torch.__version__}), preflight=src_state)
 
     t0 = time.monotonic()
     rng = np.random.default_rng(cfg.get("seed", 1337))
