@@ -361,3 +361,20 @@
     silently, not a choice among the options above. Until the owner
     decides, a new S2 run either waits or is built with an explicit
     --override-l12 or --rule v1, and says which.
+- id: L-13
+  severity: low
+  status: open
+  title: Trainers cannot resume; a preempted run restarts from step 0
+  detail: >
+    train.py, train_s3.py and train_s5.py now stop cleanly on SIGTERM
+    (src/lemma/preempt.py, sent by homeserv gpu-run when a recording starts
+    on the box): rolling checkpoint written, run sealed "aborted" with
+    preempted_at_step, exit 75. The rolling checkpoint holds weights only,
+    with no optimizer state, step, or RNG state, and no trainer reads it back,
+    so a long run preempted late loses its compute. (L-13 because L-9..L-12
+    are taken on the PR 10 branch.)
+  fix: >
+    A resume checkpoint beside the rolling weights (optimizer, scheduler,
+    step, numpy + torch RNG states) and a --resume <run_id> flag that
+    continues the same run_id. The ledger record must state that the run
+    was resumed and from which step, so a resumed metric stays reproducible.
