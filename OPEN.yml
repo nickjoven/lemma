@@ -196,3 +196,20 @@
     transition against the measured Lean cost (wall_ms is recorded on every
     row) as the plan requires. Gate for the cost head: censored recall
     >= 0.5 at precision >= 0.5, and log-cost MAE <= 0.6 on uncensored rows.
+- id: L-13
+  severity: low
+  status: open
+  title: Trainers cannot resume; a preempted run restarts from step 0
+  detail: >
+    train.py, train_s3.py and train_s5.py now stop cleanly on SIGTERM
+    (src/lemma/preempt.py, sent by homeserv gpu-run when a recording starts
+    on the box): rolling checkpoint written, run sealed "aborted" with
+    preempted_at_step, exit 75. The rolling checkpoint holds weights only,
+    with no optimizer state, step, or RNG state, and no trainer reads it back,
+    so a long run preempted late loses its compute. (L-13 because L-9..L-12
+    are taken on the PR 10 branch.)
+  fix: >
+    A resume checkpoint beside the rolling weights (optimizer, scheduler,
+    step, numpy + torch RNG states) and a --resume <run_id> flag that
+    continues the same run_id. The ledger record must state that the run
+    was resumed and from which step, so a resumed metric stays reproducible.

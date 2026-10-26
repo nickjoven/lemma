@@ -19,6 +19,7 @@ import yaml
 from tokenizers import Tokenizer
 
 from . import ledger
+from .preempt import PREEMPTED, Preempt
 from .data.cache import CachedStatements
 from .models.encoder import Encoder, EncoderConfig
 from .models.heads import MLMHead
@@ -102,8 +103,15 @@ def main() -> int:
     # more than ckpt_every steps again. Only the FINAL checkpoint is ket-put —
     # periodic ones overwrite one file so disk/CAS don't fill with 30 copies.
     rolling = ckpt_dir / f"{run_id}-latest.safetensors"
+    pre = Preempt()  # SIGTERM from gpu-run: stop at a step boundary with a checkpoint
     model.train()
     for step in range(steps):
+        if pre.requested:
+            save_ckpt(rolling)
+            print(f"step {step}: preempted, rolling checkpoint -> {rolling.name}", flush=True)
+            ledger.finish_run(rec, {"preempted_at_step": step, "rolling_checkpoint": rolling.name},
+                              started_monotonic=t0, status="aborted")
+            return PREEMPTED
         if step > 0 and step % ckpt_every == 0:
             save_ckpt(rolling)
             print(f"step {step}: rolling checkpoint -> {rolling.name}", flush=True)

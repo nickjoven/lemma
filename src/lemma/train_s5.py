@@ -27,6 +27,7 @@ from safetensors.torch import save_file
 from tokenizers import Tokenizer
 
 from . import ledger
+from .preempt import PREEMPTED, Preempt
 from .data import splits
 from .data.corpus import CORPORA, encoder_text, iter_rows
 from .models.encoder import Encoder
@@ -148,8 +149,15 @@ def main() -> int:
     rolling, best_path = ckpt_dir / f"{run_id}-latest.safetensors", ckpt_dir / f"{run_id}-best.safetensors"
     best_mrr, best_step = -1.0, -1
     losses, accs = [], []
+    pre = Preempt()  # SIGTERM from gpu-run: stop at a step boundary with a checkpoint
     model.train()
     for step in range(steps):
+        if pre.requested:
+            save_ckpt(model, rolling)
+            print(f"step {step}: preempted, rolling checkpoint -> {rolling.name}", flush=True)
+            ledger.finish_run(rec, {"preempted_at_step": step, "rolling_checkpoint": rolling.name},
+                              started_monotonic=t0, status="aborted")
+            return PREEMPTED
         if step > 0 and step % ckpt_every == 0:
             save_ckpt(model, rolling)
             print(f"step {step}: rolling checkpoint", flush=True)
