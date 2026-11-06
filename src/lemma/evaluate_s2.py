@@ -103,13 +103,31 @@ def check_manifest_file(manifest_path: Path, binding: split_binding.Binding) -> 
 
 
 def heldout_pool(rows, assign: dict[str, str], n_groups: int, n_distractors: int,
-                 rng: random.Random, split: str = "test"):
+                 rng: random.Random, split: str = "test", rule: str | None = None):
     """Queries and candidates drawn from `split` only. Returns (members,
     distractors, stats). Raises CorpusError if any lock of the split also
     occurs outside it: that would be leakage, and the split rule promises it
-    cannot happen, so it is checked rather than trusted."""
+    cannot happen, so it is checked rather than trusted.
+
+    Under RULE_V3 only THEOREM locks are promised to stay inside a split: a
+    def/inductive lock is a shared signature and may cross (OPEN.yml L-12).
+    A crossing theorem lock is still an error; rows carrying a crossing
+    signature lock are dropped from the pool (neither query nor distractor)
+    and counted in the stats, so no text the encoder saw in training under
+    the same lock enters the held-out pool."""
     in_split = [r for r in rows if assign.get(r.name) == split]
     outside_locks = {r.lock for r in rows if assign.get(r.name) != split}
+    crossing = {r.lock for r in in_split} & outside_locks
+    excluded_locks: set[str] = set()
+    if crossing and rule is not None and splits.rule_id(rule) == splits.RULE_V3:
+        statements = splits.joining_locks(rows, splits.RULE_V3)
+        theorem_leaks = sorted(crossing & statements)
+        if theorem_leaks:
+            raise CorpusError(f"{len(theorem_leaks)} theorem lock(s) of the {split} split also occur outside "
+                              f"the {split} split: {theorem_leaks[:3]}")
+        excluded_locks = crossing
+    n_rows_before = len(in_split)
+    in_split = [r for r in in_split if r.lock not in excluded_locks]
     # disclosed, not refused: a manifest built under the pre-#6 rule keeps locks
     # inside a split but can split a module, so its test split is held out by
     # declaration and lock, not by whole module; this count says how far
@@ -135,6 +153,7 @@ def heldout_pool(rows, assign: dict[str, str], n_groups: int, n_distractors: int
              "modules_in_split": len({r.module for r in in_split}),
              "modules_shared_with_other_splits": len(shared_modules),
              "groups": len(groups), "queries": len(members), "distractors": len(distractors),
+             "signature_locks_excluded": len(excluded_locks), "rows_excluded": n_rows_before - len(in_split),
              "query_names_cid": None, "pool_names_cid": None}
     return members, distractors, stats
 
@@ -230,7 +249,8 @@ def main() -> int:
     enc = load_encoder(ckpt, tok.get_vocab_size(), device)
 
     rng = random.Random(args.seed)
-    members, distractors, pool_stats = heldout_pool(rows, assign, args.groups, args.distractors, rng, args.split)
+    members, distractors, pool_stats = heldout_pool(rows, assign, args.groups, args.distractors, rng, args.split,
+                                                    rule=binding.rule_id)
     groups = pool_stats["groups"]
     pool = members + distractors
     texts = [encoder_text(r) for r in pool]

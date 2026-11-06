@@ -56,7 +56,7 @@ def record_cache_split(cache_dir: Path) -> str:
     if "rule_id" not in manifest:
         raise SystemExit(f"{split_manifest} names no rule_id (built before #10); rebuild the cache")
     cert = splits.certificate(manifest["assignment"], manifest["rule_id"])
-    if cert["rule_id"] == splits.RULE_V2:
+    if cert["rule_id"] in splits.COMPONENT_RULES:
         largest = (manifest.get("components") or {}).get("largest_component_rows")
         if largest is None:
             raise SystemExit(f"{split_manifest} discloses no component statistics; the L-12 guard cannot be checked")

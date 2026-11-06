@@ -20,7 +20,7 @@ that checkpoint's pretraining), resolves the split here instead:
      evidence (evaluate_s2's cache report) check it, and the binding is
      recorded with every number. An explicit rule on an unpinned run is an
      escape hatch, not evidence: it is taken on the caller's word, disclosed
-     as pin_source "explicit", and only RULE_V2 can be given this way (v1
+     as pin_source "explicit", and only a component rule (v2, v3) can be given this way (v1
      needs the pin's shard order, below).
 
 What ties the rows to the corpus the run trained on, exactly:

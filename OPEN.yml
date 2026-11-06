@@ -285,7 +285,7 @@
     evaluation of that pair.
 - id: L-12
   severity: high
-  status: open (owner decision owed; until then build_cache refuses a component-rule split whose largest component exceeds 10% of rows, and every evaluator takes the split its run trained against)
+  status: closed 2026-11-05 by owner decision (option C, RULE_V3), only theorem locks join modules; the 10% guard stays as a tripwire
   title: the connected-component split rule produces one giant component holding 45% of the corpus
   detail: >
     Under the rule on github #10 (modules joined by shared locks form one
@@ -361,6 +361,32 @@
     silently, not a choice among the options above. Until the owner
     decides, a new S2 run either waits or is built with an explicit
     --override-l12 or --rule v1, and says which.
+  decision: >
+    2026-11-05, Nick: option C. A lock is BLAKE3 of a declaration's type: for
+    a theorem that is its statement (a shared lock is a duplicate), for a
+    def/inductive/opaque only a signature. Every hub behind the giant
+    component is a signature: Lean.TrailingParserDescr (278 modules),
+    Lean.ParserDescr (276), Type -> Type (170 modules, inductives and defs),
+    Positivity extensions, Real -> Real, Nat -> Nat; no theorem lock joins
+    more than a handful of modules. Measured on the 296,187-row corpus
+    (rows 228,608 theorem / 64,140 def / 3,408 inductive / 31 opaque), same
+    hash and 90/5/5 weights, unsealed analysis 2026-11-05:
+      v2 (all locks join): largest component 45.1% (1,748 modules), test 8,595, 170 test duplicate groups
+      B, hub locks over 10 modules excluded: largest 10.2%, test 15,015, 442 groups, 24 locks cross splits
+      B, over 5 excluded: largest 1.6%, test 16,324, 404 groups, 45 locks cross
+      C, theorem locks only (chosen): largest 0.4% (6 modules), 6,994 components,
+        train/val/test 266,342/14,932/14,913, 420 test duplicate groups, 0
+        theorem rows sharing a lock with train; 191 signature locks cross
+        splits, carried by 248 def and 114 inductive rows in val/test (2.1% of
+        non-train rows)
+    Implemented as RULE_V3 (splits.assign; v2 kept as assign_v2, unused by any
+    sealed run). The manifest discloses signature_locks_across_splits;
+    evaluate_s2.heldout_pool under v3 drops rows with a crossing signature
+    lock from the pool (counted in its stats) and still refuses a crossing
+    theorem lock. Every sealed S2-W0 number keeps its v1 qualification (held
+    out by declaration and lock, not by module); module-held-out claims need
+    a retrain under v3 (github #11). The v3 numbers are sealed with the
+    first v3 split manifest.
 - id: L-13
   severity: low
   status: open

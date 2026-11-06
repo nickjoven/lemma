@@ -163,10 +163,10 @@ def test_manifest_file_must_name_the_resolved_rule_and_hold_its_assignment(tmp_p
     from test_split_binding import rule_change_rows
     rows = rule_change_rows()
     legacy = Binding(splits.assign_v1(rows), splits.RULE_V1, "cid", "pinned_rule_reconstructed")
-    # build_cache now overwrites the mutable manifest with a v2 one: refused for a v1 run
-    (tmp_path / "v2.json").write_text(json.dumps(splits.manifest(rows)))
-    with pytest.raises(CorpusError, match="built under v2"):
-        check_manifest_file(tmp_path / "v2.json", legacy)
+    # build_cache now overwrites the mutable manifest with a current-rule one: refused for a v1 run
+    (tmp_path / "v3.json").write_text(json.dumps(splits.manifest(rows)))
+    with pytest.raises(CorpusError, match="built under " + splits.CURRENT_RULE):
+        check_manifest_file(tmp_path / "v3.json", legacy)
     # an older manifest that carries only the free-text rule is accepted iff it is the same split
     old = {"rule": "module-area blake3, lock-follows-first, mutant-inherits-parent",
            "assignment": splits.assign_v1(rows)}
@@ -339,3 +339,29 @@ def test_split_flag_accepts_only_held_out_splits(monkeypatch, capsys):
     with pytest.raises(SystemExit) as e:
         evaluate_s2.main()
     assert e.value.code == 2 and "invalid choice" in capsys.readouterr().err
+
+
+def test_v3_pool_drops_crossing_signature_rows_but_refuses_theorem_leaks():
+    from lemma.data import splits
+    from lemma.evaluate_s2 import CorpusError
+    from lemma.schemas import DeclarationRow
+
+    def r(name, module, lock, kind):
+        return DeclarationRow(name=name, module=module, kind=kind, canonical_type=f"T[{name}]",
+                              lock=lock, proof_consts=[])
+    rows = [r("q1", "Mathlib.Test", "dup", "theorem"), r("q2", "Mathlib.Test", "dup", "theorem"),
+            r("s_test", "Mathlib.Test", "sig", "def"), r("s_train", "Mathlib.Train", "sig", "def"),
+            r("x", "Mathlib.Test", "solo", "theorem")]
+    assign = {"q1": "test", "q2": "test", "s_test": "test", "s_train": "train", "x": "test"}
+    members, distractors, stats = heldout_pool(rows, assign, 10, 10, random.Random(0), rule=splits.RULE_V3)
+    pool = {m.name for m in members} | {d.name for d in distractors}
+    assert "s_test" not in pool and {"q1", "q2"} <= pool
+    assert stats["signature_locks_excluded"] == 1 and stats["rows_excluded"] == 1
+    # the same crossing is still an error under the strict (v1/v2) reading
+    with pytest.raises(CorpusError):
+        heldout_pool(rows, assign, 10, 10, random.Random(0))
+    # and a crossing THEOREM lock is an error under v3 too
+    rows.append(r("leak", "Mathlib.Train", "dup", "theorem"))
+    assign["leak"] = "train"
+    with pytest.raises(CorpusError):
+        heldout_pool(rows, assign, 10, 10, random.Random(0), rule=splits.RULE_V3)

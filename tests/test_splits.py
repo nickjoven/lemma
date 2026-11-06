@@ -102,3 +102,62 @@ def test_manifest_reports_component_sizes():
         "modules_in_multi_module_components": 2, "largest_component_modules": 2,
         "largest_component_rows": 2,
     }
+
+
+# --- RULE_V3 (OPEN.yml L-12, owner decision 2026-11-05): only theorem locks join modules ---
+
+def row(name, module, lock, kind):
+    return DeclarationRow(name=name, module=module, kind=kind,
+                          canonical_type=f"T[{name}]", lock=lock, proof_consts=[])
+
+
+def _modules_in_different_splits(n=400):
+    """two module names whose own hashes land in different splits"""
+    mods = [f"Mathlib.M{i}" for i in range(n)]
+    by = {}
+    for m in mods:
+        by.setdefault(splits.split_of_area(m), m)
+    return by["train"], by["test"]
+
+
+def test_v3_signature_lock_does_not_join_modules():
+    a, b = _modules_in_different_splits()
+    rows = [row("f", a, "sig", "def"), row("g", b, "sig", "def")]
+    got = splits.assign(rows)
+    assert got["f"] == "train" and got["g"] == "test"          # each module keeps its own split
+    assert splits.assign_v2(rows)["f"] == splits.assign_v2(rows)["g"]   # v2 joined them
+
+
+def test_v3_theorem_lock_still_joins_modules():
+    a, b = _modules_in_different_splits()
+    rows = [row("t1", a, "stmt", "theorem"), row("t2", b, "stmt", "theorem")]
+    got = splits.assign(rows)
+    assert got["t1"] == got["t2"]
+
+
+def test_v3_mixed_kind_lock_does_not_join():
+    # a lock carried by a theorem and a def is a coincidence of types, not a duplicate statement
+    a, b = _modules_in_different_splits()
+    rows = [row("t", a, "mixed", "theorem"), row("d", b, "mixed", "def")]
+    got = splits.assign(rows)
+    assert got["t"] != got["d"]
+    assert splits.joining_locks(rows, splits.RULE_V3) == set()
+
+
+def test_v3_is_current_and_discloses_crossing_signatures():
+    a, b = _modules_in_different_splits()
+    rows = [row("f", a, "sig", "def"), row("g", b, "sig", "def"), row("t", a, "s1", "theorem")]
+    assert splits.CURRENT_RULE == splits.RULE_V3
+    man = splits.manifest(rows)
+    assert man["rule_id"] == splits.RULE_V3
+    assert man["signature_locks_across_splits"] == {"locks": 1, "rows_outside_train": 1}
+    assert splits.rule_id(man["rule"]) == splits.RULE_V3
+
+
+def test_v3_hub_signature_cannot_build_a_giant_component():
+    # one parser-descriptor-like signature shared by 50 modules: v2 makes one component, v3 keeps 50
+    rows = [row(f"p{i}", f"Mathlib.P{i}", "Lean.ParserDescr", "def") for i in range(50)]
+    rows += [row(f"t{i}", f"Mathlib.P{i}", f"stmt{i}", "theorem") for i in range(50)]
+    assert splits.component_stats(rows, splits.RULE_V2)["largest_component_modules"] == 50
+    assert splits.component_stats(rows, splits.RULE_V3)["largest_component_modules"] == 1
+    splits.component_guard(rows, splits.RULE_V3)

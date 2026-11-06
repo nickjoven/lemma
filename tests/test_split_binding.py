@@ -470,6 +470,6 @@ def test_build_cache_main_refuses_l12_and_records_the_override(tmp_path, monkeyp
         main(tmp_path / "v1", "--rule", splits.RULE_V1, "--override-l12")
     assert main(tmp_path / "over", "--override-l12") == 0
     man = json.loads((tmp_path / "over" / "split-manifest.json").read_text())
-    assert man["l12_override"] is True and man["rule_id"] == splits.RULE_V2
+    assert man["l12_override"] is True and man["rule_id"] == splits.CURRENT_RULE
     cert = json.loads(ledger.ket_get_verified(record_cache_split(tmp_path / "over")))
     assert cert["l12_override"] is True

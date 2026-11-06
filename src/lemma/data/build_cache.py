@@ -31,17 +31,17 @@ def main() -> int:
     ap.add_argument("--rule", default=splits.CURRENT_RULE, choices=sorted(splits.ASSIGNERS),
                     help="split rule; v1 only to rebuild a legacy cache (it can split a module, #6)")
     ap.add_argument("--override-l12", action="store_true",
-                    help="build a v2 split despite the L-12 giant-component guard (recorded in the manifest, "
+                    help="build a component-rule split despite the L-12 giant-component guard (recorded in the manifest, "
                          "and from there in the split certificate a training run records)")
     args = ap.parse_args()
-    if args.override_l12 and args.rule != splits.RULE_V2:
-        raise SystemExit("--override-l12 applies to the component rule (v2) only")
+    if args.override_l12 and args.rule not in splits.COMPONENT_RULES:
+        raise SystemExit("--override-l12 applies to the component rules (v2, v3) only")
 
     tok = Tokenizer.from_file(str(args.tokenizer))
     rows = list(iter_rows("declarations"))
-    if args.rule == splits.RULE_V2 and not args.override_l12:
+    if args.rule in splits.COMPONENT_RULES and not args.override_l12:
         try:
-            splits.component_guard(rows)
+            splits.component_guard(rows, args.rule)
         except ValueError as e:
             raise SystemExit(str(e))
     assignment = splits.assign_under(args.rule, rows)
