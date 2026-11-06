@@ -1,4 +1,6 @@
-"""S5 equivalence-discovery eval on held-out modules, with controls.
+"""S5 equivalence-discovery eval on the held-out test split the run trained
+against (split_binding; for a v1 run held out by declaration and lock, not by
+whole module, OPEN.yml L-12), with controls.
 
   known-iff   lhs -> rhs retrieval among all test rhs PLUS a distractor pool of
               test-split statements: MRR (the S5 GATE, >= 0.5), R@1, R@10
@@ -30,11 +32,10 @@ from sklearn.metrics import roc_auc_score
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data import splits
-from .data.corpus import encoder_text, iter_rows
+from .data.corpus import encoder_text
 from .models.encoder import Encoder, EncoderConfig
 from .train_s3 import tokenize
-from .train_s5 import EquivModel, equivalence_pairs_by_split
+from .train_s5 import EquivModel, equivalence_pairs_for
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MRR_GATE = 0.5
@@ -57,21 +58,22 @@ def main() -> int:
     ap.add_argument("--proposals", type=int, default=100)
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
     rng = random.Random(args.seed)
     max_seq = 256
 
     train_rec = ledger.citable(args.run)
+    by_split, rows, binding = equivalence_pairs_for(train_rec)   # the split this run trained against (review of #10)
     tok = Tokenizer.from_file(str(REPO_ROOT / "runs" / "tokenizer" / "lean-unigram-32k.json"))
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = EquivModel(Encoder(EncoderConfig(vocab_size=tok.get_vocab_size(), max_seq=max_seq)), 256)
     model.load_state_dict(load_file(str(REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors")))
     model = model.to(device).eval()
 
-    test = equivalence_pairs_by_split()["test"]
+    test = by_split["test"]
     iff = [p for p in test if p[3] == "iff"]
     dedup = [p for p in test if p[3] == "dedup"]
-    rows = list(iter_rows("declarations", verify=False))
-    assign = splits.assign(rows)
+    assign = binding.assignment
     test_rows = [r for r in rows if assign[r.name] == "test"]
     distractor_rows = rng.sample(test_rows, min(args.distractors, len(test_rows)))
     t0 = time.monotonic()
@@ -130,6 +132,7 @@ def main() -> int:
     prop_cid = ledger.ket_put(prop_path.read_bytes())
 
     metrics = {
+        "split": binding.disclosure(),
         "test_iff": len(iff), "distractors": len(distractor_rows),
         "iff_mrr": round(mrr, 4), "iff_recall@1": round(r1, 4), "iff_recall@10": round(r10, 4),
         "dedup_mrr": round(dd_mrr, 4) if dd_mrr == dd_mrr else None,
@@ -148,9 +151,9 @@ def main() -> int:
         run_id=f"s5-eval-{args.run}", kind="eval", stage="S5", started=ledger.now_iso(),
         inputs=ledger.RunInputs(corpus_cids=train_rec.inputs.corpus_cids, tokenizer_cid=train_rec.inputs.tokenizer_cid,
                                 config_cid=train_rec.inputs.config_cid, init_checkpoint_cid=train_rec.checkpoint_cids[-1],
-                                code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
+                                split_manifest_cid=binding.certificate_cid, code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
-    ledger.start_run(rec)
+    ledger.start_run(rec, preflight=src_state)
     rec.calibration_record_cid = ledger.ket_put_json(calib)
     ledger.finish_run(rec, metrics, started_monotonic=t0,
                       status="completed" if calib["pass"] else "calibration_failed")

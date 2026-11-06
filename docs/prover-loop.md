@@ -30,7 +30,8 @@ open questions with recorded choices.
      report per-class support; **if `rejected` support is small, collapse to
      `proven` vs `not-proven`** (and drop `rejected` from the macro average).
      The reported gate is over the classes that have support.
-   - Same controls as v1: module-held-out mutants, bag-of-tokens margin
+   - Same controls as v1: held-out-split mutants (by declaration and lock
+     under the v1 rule, not whole module; `OPEN.yml` L-12), bag-of-tokens margin
      ≥ 10 pts, held-out-operator OOD, permutation. Sample: the existing 8,187
      statement mutants (quod decision 4).
 
@@ -63,7 +64,8 @@ negative, and gate-wiring control sets (quod PR #2, exit conditions 1–4).
 ## Exit conditions
 
 - S4 v2: macro-F1 ≥ 0.80 over the classes with support (three-way, or
-  proven-vs-not if `rejected` support is small), on module-held-out mutants,
+  proven-vs-not if `rejected` support is small), on held-out-split mutants
+  (whole-module only under a component-rule split; `OPEN.yml` L-12),
   beating bag-of-tokens by ≥ 10 pts, with the OOD-operator number and a
   prover hold-out number reported separately; per-class support reported.
 - S5: discharged count of the reranked top-100, per bucket, against 10.

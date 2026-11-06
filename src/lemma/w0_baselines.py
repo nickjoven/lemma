@@ -9,8 +9,8 @@ retrieval MRR among the held-out candidates for
     identity      predict z_before
     offset        predict z_before + mu_tactic     (mu fitted on train split)
     lexical       TF-IDF cosine of the before-goal text against candidate texts
-W0's gate is to beat offset AND lexical by >= 10 points on module-held-out
-transitions. A tactic whose offset baseline is within `translation_margin`
+W0's gate is to beat offset AND lexical by >= 10 points on held-out
+transitions (the S2 run's trained split; see the recorded split disclosure). A tactic whose offset baseline is within `translation_margin`
 of the best learned predictor is recorded as "translation" (no GPU spent).
 
 Energy targets (item 6): per goal state, the empirical closure rate over the
@@ -40,8 +40,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from tokenizers import Tokenizer
 
 from . import ledger
-from .data import splits
-from .data.corpus import iter_goals, iter_rows, iter_transitions
+from .data import split_binding, splits
+from .data.corpus import iter_goals, iter_transitions
 from .train_s3 import load_s2_encoder, tokenize
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -127,19 +127,20 @@ def main() -> int:
     ap.add_argument("--translation-margin", type=float, default=0.03)
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
     rng = random.Random(args.seed)
     t0 = time.monotonic()
 
     s2_rec = ledger.citable(args.s2_run)
+    # the split the S2 encoder trained against, as the W0 model on top of it will (review of #10)
+    _, binding = split_binding.resolve_corpus(s2_rec)
     tok = Tokenizer.from_file(args.tokenizer)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     enc = load_s2_encoder(REPO_ROOT / "runs" / "ckpts" / f"{args.s2_run}.safetensors", tok.get_vocab_size(), args.max_seq).to(device).eval()
 
     goals = {g.lock: g.readable for g in iter_goals()}
     rows = list(iter_transitions())
-    decl_rows = list(iter_rows("declarations", verify=False))
-    assign = splits.assign(decl_rows)
-    split_of = splits.assign_transitions(rows, assign)
+    split_of = splits.assign_transitions(rows, binding.assignment)
     steps = [(i, t) for i, t in enumerate(single_step_rows(rows)) if t.goal_before in goals and t.goal_after[0] in goals]
     # re-index split by original row identity
     row_index = {id(t): i for i, t in enumerate(rows)}
@@ -157,7 +158,7 @@ def main() -> int:
     off = offsets_by_tactic(zb_tr, za_tr, [t.tactic for t in train]) if train else {}
     zb_te, za_te = emb_pair(test)
     tgt = np.arange(len(test))
-    results = {"n_train_steps": len(train), "n_test_steps": len(test)}
+    results = {"split": binding.disclosure(), "n_train_steps": len(train), "n_test_steps": len(test)}
     if test:
         pred_off = np.stack([zb_te[i] + off.get(t.tactic, {"mu": np.zeros(zb_te.shape[1])})["mu"] for i, t in enumerate(test)])
         results["mrr_identity"] = round(mrr(zb_te, za_te, tgt), 4)
@@ -193,16 +194,16 @@ def main() -> int:
     energy_path.write_text("".join(json.dumps({"goal": k, **v}) + "\n" for k, v in energy.items()))
     results["energy_table_cid"] = ledger.ket_put(energy_path.read_bytes())
     results["gate_for_w0"] = {"beat_offset_by": 0.10, "beat_lexical_by": 0.10, "translation_margin": args.translation_margin,
-                              "note": "W0 must exceed max(mrr_offset, mrr_lexical) + 0.10 on module-held-out single-step transitions; tactics whose offset MRR is within the margin of W0 are 'translation' and get no GPU"}
+                              "note": "W0 must exceed max(mrr_offset, mrr_lexical) + 0.10 on held-out single-step transitions (the trained split, disclosed under 'split'); tactics whose offset MRR is within the margin of W0 are 'translation' and get no GPU"}
 
     cfg_cid = ledger.ket_put_json({"s2_run": args.s2_run, "max_seq": args.max_seq, "max_candidates": args.max_candidates, "seed": args.seed})
     rec = ledger.RunRecord(
         run_id=f"w0-baselines-{time.strftime('%Y%m%d-%H%M%S')}", kind="eval", stage="W0", started=ledger.now_iso(),
         inputs=ledger.RunInputs(corpus_cids=s2_rec.inputs.corpus_cids, tokenizer_cid=s2_rec.inputs.tokenizer_cid,
                                 config_cid=cfg_cid, init_checkpoint_cid=s2_rec.checkpoint_cids[-1],
-                                code_git=ledger.git_head(), mathlib_pin=s2_rec.inputs.mathlib_pin),
+                                split_manifest_cid=binding.certificate_cid, code_git=ledger.git_head(), mathlib_pin=s2_rec.inputs.mathlib_pin),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
-    ledger.start_run(rec)
+    ledger.start_run(rec, preflight=src_state)
     ledger.finish_run(rec, results, started_monotonic=t0)
     print(json.dumps({**results, "metrics_cid": rec.metrics_cid}, indent=1))
     return 0

@@ -1,4 +1,8 @@
-"""S3 gloss-fidelity eval on held-out (test-split) modules, with controls.
+"""S3 gloss-fidelity eval on the held-out test split, with controls.
+
+The split is the one the run trained against (split_binding); for every
+sealed S3 run that is the v1 rule, held out by declaration and lock, not by
+whole module (OPEN.yml L-12).
 
   retrieval   gloss -> its statement among all test statements (MRR, R@1, R@10)
   drift-easy  ROC-AUC: matched pair vs docstring x random other statement
@@ -54,9 +58,11 @@ def main() -> int:
     ap.add_argument("--run", required=True)
     ap.add_argument("--seed", type=int, default=1337)
     args = ap.parse_args()
+    src_state = ledger.preflight_source()  # refuse a dirty tree before compute; start_run checks it did not change since
     rng = random.Random(args.seed)
 
     train_rec = ledger.citable(args.run)
+    test, binding = gloss_pairs("test", train_rec)   # the split this run trained against (review of #10)
     cfg_max_seq = 256
     tok = Tokenizer.from_file(str(REPO_ROOT / "runs" / "tokenizer" / "lean-unigram-32k.json"))
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -65,7 +71,6 @@ def main() -> int:
     model.load_state_dict(load_file(str(REPO_ROOT / "runs" / "ckpts" / f"{args.run}.safetensors")))
     model = model.to(device).eval()
 
-    test = gloss_pairs("test")
     glosses = [t[0] for t in test]
     stmts = [t[1] for t in test]
     mods = [t[2] for t in test]
@@ -125,6 +130,7 @@ def main() -> int:
         "permutation_auc": round(auc_perm, 4),
         "hard_auc_gate": HARD_AUC_GATE, "pass_hard_auc": auc_hard >= HARD_AUC_GATE,
         "deferred": "docstring x gate-verified mutant AUC (needs Phase-3 mutant corpus)",
+        "split": binding.disclosure(),
     }
     calib = {"pass": metrics["pass_hard_auc"] and 0.45 <= auc_perm <= 0.55,
              "controls": [
@@ -137,10 +143,10 @@ def main() -> int:
         inputs=ledger.RunInputs(corpus_cids=train_rec.inputs.corpus_cids,
                                 tokenizer_cid=train_rec.inputs.tokenizer_cid,
                                 config_cid=train_rec.inputs.config_cid,
-                                init_checkpoint_cid=train_rec.checkpoint_cids[-1],
+                                init_checkpoint_cid=train_rec.checkpoint_cids[-1], split_manifest_cid=binding.certificate_cid,
                                 code_git=ledger.git_head(), mathlib_pin=train_rec.inputs.mathlib_pin),
         seed=args.seed, hardware={"gpu": torch.cuda.get_device_name(0) if device == "cuda" else "cpu"})
-    ledger.start_run(rec)
+    ledger.start_run(rec, preflight=src_state)
     rec.calibration_record_cid = ledger.ket_put_json(calib)
     ledger.finish_run(rec, metrics, started_monotonic=t0,
                       status="completed" if calib["pass"] else "calibration_failed")
